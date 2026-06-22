@@ -113,7 +113,7 @@ export const sendMovie = async (ctx, movie, dbUser) => {
 export const setupUserCommands = (bot) => {
 
     // Handle "🔍 Kino qidirish"
-    bot.hears(['🔍 Kino qidirish', '🔍 Поиск фильмов', '🔍 Search Movies'], (ctx) => {
+    bot.hears(['🔍 Kino qidirish', '🔍 Qidirish', '🔍 Поиск фильмов', '🔍 Search Movies'], (ctx) => {
         ctx.reply(ctx.t('search_prompt'), { parse_mode: 'HTML' }).catch(() => { });
     });
 
@@ -492,12 +492,7 @@ export const setupUserCommands = (bot) => {
             const isButton = Object.values(ctx.session?.user?.language ? {} : {}).some(val => val === ctx.message.text);
             // Simplified button texts check for avoiding text handler conflicts
             const buttonTexts = [
-                '🔍 Kino qidirish', '🆕 Yangi kinolar', '📂 Kategoriyalar', '🔥 Top kinolar', '🎲 Tasodifiy kino',
-                '👤 Shaxsiy Kabinet', '⚙️ Sozlamalar',
-                // Ru
-                '🔍 Поиск фильмов', '📂 Категории', '🆕 Новинки', '🔥 Топ фильмы', '🎲 Случайный фильм', '👤 Личный кабинет', '⚙️ Настройки',
-                // En
-                '🔍 Search Movies', '📂 Categories', '🆕 New Movies', '🔥 Top Movies', '🎲 Random Movie', '👤 My Cabinet', '⚙️ Settings',
+                '🔍 Search Movies', '🔍 Qidirish', '🔍 Поиск фильмов', '📂 Categories', '🆕 New Movies', '🔥 Top Movies', '🎲 Random Movie', '👤 My Cabinet', '⚙️ Settings',
                 // Legacy / Settings
                 '🇺🇿 O\'zbekcha', '🇷🇺 Русский', '🇬🇧 English', '🏠 Bosh menyu', '🏠 Главное меню', '🏠 Main Menu'
             ];

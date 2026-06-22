@@ -12,7 +12,7 @@ export const sendMainMenu = async (ctx) => {
         if (user) ctx.session.user = user;
 
         // Define simple and professional buttons
-        const defaultWebAppUrl = 'https://filmxbot-demo.onrender.com/webapp'; // Default public facing url for local tests
+        const defaultWebAppUrl = 'https://film-bot-ce5b.onrender.com/webapp'; // Default public facing url
         const webAppUrl = process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/webapp` : defaultWebAppUrl;
         
         let menu = [

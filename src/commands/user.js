@@ -105,6 +105,7 @@ export const sendMovie = async (ctx, movie, dbUser) => {
         return true;
     } catch (error) {
         logger.error('sendMovie error:', error);
+        await ctx.reply(`⚠️ <b>Ushbu kinoning fayli eskirgan yoki o'chirilgan!</b>\n\nIltimos, bu haqida adminlarga xabar bering.`, { parse_mode: 'HTML' }).catch(() => {});
         return false;
     }
 };

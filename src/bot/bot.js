@@ -32,21 +32,15 @@ const stage = new Scenes.Stage([
     addMovieScene, 
     bulkAddMovieScene,
     broadcastScene, 
-    vipScene, 
     reviewScene, 
     requestScene, 
     reportScene, 
-    promoWizard, 
-    redeemSchema, 
     editMovieScene, 
     autoPostSettingsScene, 
     mandatorySubscriptionScene,
     userProfileScene,
-    globalVipScene,
     directMessageScene,
-    startGifScene,
-    addFavCodeScene,
-    paymentReceiptScene
+    startGifScene
 ]);
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -64,9 +58,6 @@ setupCategoryCommands(bot);
 setupUserCommands(bot); // User commands should be last (has text handler)
 setupInlineSearch(bot);
 setupChannelGuard(bot);
-
-// Initialize VIP Expiration Scheduler
-initVipScheduler(bot);
 
     // Check Subscription moved exclusively to start.js to run with proper Delete Message!
 

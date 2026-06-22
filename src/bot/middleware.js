@@ -7,12 +7,7 @@ import AdminLog from '../models/AdminLog.js';
 import Channel from '../models/Channel.js';
 import User from '../models/User.js';
 
-const vipPromoMessages = [
-    "🚀 <b>Tezkor yuklab olishni xohlaysizmi?</b>\n\n💎 VIP obuna bo'ling va cheklovsiz tezlikda yuklang!",
-    "⭐️ <b>Reklamalardan charchadingizmi?</b>\n\n💎 VIP status oling va reklamasiz botdan foydalaning!",
-    "🎬 <b>Yangi kinolarni birinchilardan bo'lib ko'ring!</b>\n\n💎 VIP foydalanuvchilar uchun eksklyuziv imkoniyatlar.",
-    "🔒 <b>Maxfiy chat va ko'proq imkoniyatlar!</b>\n\n💎 VIP obuna bilan barchasiga ega bo'ling."
-];
+
 // 🛡️ Rate Limiting & Anti-Flood using NodeCache
 import NodeCache from 'node-cache';
 const rateLimitCache = new NodeCache({ stdTTL: 60, checkperiod: 60 });
@@ -113,24 +108,7 @@ export const authMiddleware = async (ctx, next) => {
             return user && user.vipUntil && new Date(user.vipUntil) > new Date();
         };
 
-        // Attach VIP promo helper
-        ctx.showVipPromo = async (forceShow = false) => {
-            // Only show to non-VIP users
-            if (ctx.isVip() && !forceShow) return;
 
-            const randomPromo = vipPromoMessages[Math.floor(Math.random() * vipPromoMessages.length)];
-
-            try {
-                await ctx.reply(randomPromo, {
-                    parse_mode: 'HTML',
-                    ...Markup.inlineKeyboard([
-                        [Markup.button.callback('💎 VIP Olish', 'vip_info')]
-                    ])
-                });
-            } catch (e) {
-                // Silently fail
-            }
-        };
 
         // 📢 MANDATORY SUBSCRIPTION CHECK - ALL USERS (including admin)
         try {

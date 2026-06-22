@@ -17,16 +17,11 @@ export const sendMainMenu = async (ctx) => {
         
         let menu = [
             [Markup.button.webApp('🌐 Kinolar Katalogi', webAppUrl)],
-            [ctx.t('menu_search'), ctx.t('menu_cabinet')],
-            [ctx.t('menu_random')]
+            [ctx.t('menu_search'), ctx.t('menu_settings')]
         ];
 
-        // Welcome message with VIP status
+        // Welcome message
         let welcomeMsg = ctx.t('welcome', { name: ctx.from.first_name });
-        if (isVip) {
-            const daysLeft = Math.ceil((new Date(user.vipUntil) - new Date()) / (1000 * 60 * 60 * 24));
-            welcomeMsg += `\n\n💎 <b>VIP Status:</b> Aktiv (${daysLeft} kun qoldi)`;
-        }
 
         await ctx.reply(welcomeMsg, {
             parse_mode: 'HTML',

@@ -12,11 +12,17 @@ import { getSmartRecommendations } from '../services/recommendationService.js';
 // Helper function to send movie
 export const sendMovie = async (ctx, movie, dbUser) => {
     try {
-        // Increment views
+        // VIP Check
+        const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+
+        // Increment views using updateOne (movie might be plain object from aggregate)
         if (movie._id) {
             await Movie.updateOne({ _id: movie._id }, { $inc: { views: 1 } }).catch(() => { });
         }
         const views = (movie.views || 0) + 1;
+
+        // Watermark for caption
+        const userWatermark = ctx.from.username ? `@${ctx.from.username}` : `ID: ${ctx.from.id}`;
 
         const escapeHTML = (str) => {
             if (!str) return '';
@@ -42,21 +48,37 @@ export const sendMovie = async (ctx, movie, dbUser) => {
         }
 
         let buttons = [];
+        if (!isVip) {
+            caption += `\n\n🔒 <i>Faqatgina VIP obunachilargina ushbu kinoni yuklab olib boshqalarga uzata (forward) oladi.</i>`;
+            buttons.push([Markup.button.callback('💎 VIP Olish', 'vip_info')]);
+        }
 
-        // Send video for all users
+        // Send video for all users, but lock forwarding/saving if restricted or non-VIP
         if (movie.fileId) {
             try {
+                // Video sending with protection
                 await ctx.replyWithVideo(movie.fileId, {
                     caption,
                     parse_mode: 'HTML',
-                    protect_content: movie.isRestricted ? true : false,
+                    protect_content: movie.isRestricted ? true : !isVip,
                     ...Markup.inlineKeyboard(buttons)
                 });
+
+                if (!isVip && dbUser && (dbUser.moviesWatched || 0) % 3 === 0) {
+                    setTimeout(() => ctx.showVipPromo?.(), 2000);
+                }
+
                 return true;
             } catch (e) {
                 logger.error('Video send error:', e);
+                // Fallback if video fails not implemented to avoid leak, better fail.
                 throw e;
             }
+        }
+
+        // If has link, show download only for VIP and if NOT restricted
+        if (movie.link && isVip && !movie.isRestricted) {
+            buttons.unshift([Markup.button.url('📥 Download', movie.link)]);
         }
 
         if (movie.poster) {
@@ -64,9 +86,14 @@ export const sendMovie = async (ctx, movie, dbUser) => {
                 await ctx.replyWithPhoto(movie.poster, {
                     caption,
                     parse_mode: 'HTML',
-                    protect_content: movie.isRestricted ? true : false,
+                    protect_content: movie.isRestricted ? true : !isVip,
                     ...Markup.inlineKeyboard(buttons)
                 });
+
+                if (!isVip && dbUser && (dbUser.moviesWatched || 0) % 3 === 0) {
+                    setTimeout(() => ctx.showVipPromo?.(), 2000);
+                }
+
                 return true;
             } catch (e) {
                 logger.error('Photo send error:', e);
@@ -88,6 +115,352 @@ export const setupUserCommands = (bot) => {
     // Handle "🔍 Kino qidirish"
     bot.hears(['🔍 Kino qidirish', '🔍 Qidirish', '🔍 Поиск фильмов', '🔍 Search Movies'], (ctx) => {
         ctx.reply(ctx.t('search_prompt'), { parse_mode: 'HTML' }).catch(() => { });
+    });
+
+    // Handle "🆕 Yangi kinolar"
+    bot.hears(['🆕 Yangi kinolar', '🆕 Новинки', '🆕 New Movies'], async (ctx) => {
+        try {
+            const movies = await getAllMovies();
+            if (!movies || movies.length === 0) {
+                return ctx.reply(ctx.t('not_found'));
+            }
+
+            const recent = movies.slice(0, 10);
+            let message = '🆕 <b>New Movies:</b>\n\n';
+            recent.forEach((m, i) => {
+                message += `${i + 1}. 🎬 ${m.title} — <code>${m.code}</code>\n`;
+            });
+            message += '\n<i>Send code to watch!</i>';
+
+            // Aggressive VIP Promo
+            const dbUser = await getUserByTelegramId(ctx.from.id);
+            const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+            const buttons = [];
+            if (!isVip) {
+                buttons.push([Markup.button.callback('💎 VIP Olish - Eksklyuziv!', 'vip_info')]);
+            }
+
+            await ctx.replyWithHTML(message, Markup.inlineKeyboard(buttons));
+        } catch (e) {
+            logger.error('New movies error:', e);
+            ctx.reply(ctx.t('error_general')).catch(() => { });
+        }
+    });
+
+    // Handle "🔥 Top kinolar"
+    bot.hears(['🔥 Top kinolar', '🔥 Топ фильмы', '🔥 Top Movies'], async (ctx) => {
+        try {
+            const movies = await getTopMovies(10);
+            if (!movies || movies.length === 0) {
+                return ctx.reply(ctx.t('not_found'));
+            }
+
+            let message = ctx.t('menu_top') + ':\n\n';
+            movies.forEach((m, i) => {
+                message += `${i + 1}. 🎬 ${m.title} — 👁 ${m.views}\nCode: <code>${m.code}</code>\n\n`;
+            });
+
+            // Aggressive VIP Promo
+            const dbUser = await getUserByTelegramId(ctx.from.id);
+            const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+            const buttons = [];
+            if (!isVip) {
+                buttons.push([Markup.button.callback('💎 VIP Olish', 'vip_info')]);
+            }
+
+            await ctx.replyWithHTML(message, Markup.inlineKeyboard(buttons));
+        } catch (e) {
+            logger.error('Top movies error:', e);
+            ctx.reply(ctx.t('error_general')).catch(() => { });
+        }
+    });
+
+    // Handle "🎲 Tasodifiy kino"
+    bot.hears(['🎲 Tasodifiy kino', '🎲 Случайный фильм', '🎲 Random Movie'], async (ctx) => {
+        try {
+            const count = await Movie.countDocuments();
+            if (count === 0) return ctx.reply(ctx.t('not_found'));
+            const random = Math.floor(Math.random() * count);
+            const movie = await Movie.findOne().skip(random);
+            const dbUser = await getUserByTelegramId(ctx.from.id);
+            await ctx.reply('🎲 <b>Tasodifiy tanlandi!</b>', { parse_mode: 'HTML' });
+            await sendMovie(ctx, movie, dbUser);
+        } catch (e) {
+            logger.error('Random movie error:', e);
+            ctx.reply(ctx.t('error_general')).catch(() => { });
+        }
+    });
+
+    // Handle "👤 Shaxsiy Kabinet"
+    bot.hears(['👤 Shaxsiy Kabinet', '👤 Личный кабинет', '👤 My Cabinet'], async (ctx) => {
+        try {
+            const dbUser = await getUserByTelegramId(ctx.from.id);
+            const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+            
+            let msg = `👤 <b>${ctx.t('menu_cabinet') || 'Shaxsiy Kabinet'}</b>\n\n`;
+            msg += `ID: <code>${ctx.from.id}</code>\n`;
+            if (isVip) {
+                const daysLeft = Math.ceil((new Date(dbUser.vipUntil) - new Date()) / (1000 * 60 * 60 * 24));
+                msg += `💎 <b>Status:</b> VIP (${daysLeft} kun qoldi)\n`;
+            } else {
+                msg += `💎 <b>Status:</b> Oddiy (VIP emassiz)\n`;
+            }
+            const buttons = [
+                [Markup.button.callback('❤️ Sevimlilar', 'cb_fav'), Markup.button.callback('➕ Saqlash (Kod)', 'cb_add_fav_code')],
+                [Markup.button.callback('💡 AI Tavsiyalar', 'cb_ai_rec'), Markup.button.callback('🎰 Omadni sinash', 'cb_random')],
+                [Markup.button.callback('📜 Tarixim', 'cb_history'), Markup.button.callback('📊 Statistika', 'cb_stats')],
+                [Markup.button.callback('💎 VIP Do\'kon', 'cb_shop'), Markup.button.callback(isVip ? '👑 VIP Aktiv' : '💎 VIP Olish', isVip ? 'cb_vip' : 'cb_shop')],
+                [Markup.button.callback('🏆 Reyting - Top 10', 'cb_leaderboard')]
+            ];
+
+            await ctx.reply(msg, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard(buttons)
+            });
+        } catch (e) {
+            logger.error('Cabinet error:', e);
+            ctx.reply(ctx.t('error_general')).catch(() => { });
+        }
+    });
+
+    // --- CABINET INLINE ACTIONS ---
+    bot.action('cb_add_fav_code', async (ctx) => {
+        await ctx.answerCbQuery().catch(()=>{});
+        ctx.scene.enter('ADD_FAV_CODE_SCENE');
+    });
+
+    bot.action('cb_ai_rec', async (ctx) => {
+        try {
+            await ctx.answerCbQuery('💡 AI tahlil qilmoqda...').catch(() => {});
+            const user = await User.findOne({ telegramId: ctx.from.id });
+            if (!user) return;
+            
+            const reqs = await getSmartRecommendations(user._id, 5);
+            if (!reqs || reqs.length === 0) {
+                return ctx.reply('📭 Hozircha tavsiyalar yo\'q. Ko\'proq kino ko\'ring!');
+            }
+
+            let msg = '💡 <b>AI Tavsiyalar (Sizga moslangan)</b>\n\n';
+            reqs.forEach((m, i) => {
+                msg += `${i + 1}. 🎬 ${m.title} — <code>${m.code}</code>\n`;
+            });
+            msg += '\n<i>Kodni yuboring va darhol tomosha qiling!</i>';
+            
+            await ctx.replyWithHTML(msg);
+        } catch (e) {
+            logger.error('cb_ai_rec error:', e);
+        }
+    });
+
+    bot.action('cb_random', async (ctx) => {
+        try {
+            await ctx.answerCbQuery('🎰 Tasodifiy kino qidirilmoqda...').catch(() => {});
+            const count = await Movie.countDocuments();
+            if (count === 0) return ctx.reply('📭 Kinolar yo\'q.');
+            const random = Math.floor(Math.random() * count);
+            const movie = await Movie.findOne().skip(random);
+            const user = await User.findOne({ telegramId: ctx.from.id });
+            await sendMovie(ctx, movie, user);
+        } catch (e) {}
+    });
+
+    bot.action('cb_bonus', async (ctx) => {
+        try {
+            const user = await User.findOne({ telegramId: ctx.from.id });
+            if (!user) return ctx.answerCbQuery('❌ Xatolik', { show_alert: true });
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (user.lastDailyBonus && new Date(user.lastDailyBonus) >= today) {
+                return ctx.answerCbQuery('⏳ Siz bugungi bonusni olib bo\'lgansiz! O\'yin ertaga davom etadi.', { show_alert: true });
+            }
+            
+            user.points = (user.points || 0) + 10;
+            user.lastDailyBonus = new Date();
+            await user.save();
+            
+            await ctx.answerCbQuery('🎁 Tabriklaymiz! O\'yindan +10 ball yutdingiz.', { show_alert: true });
+        } catch (e) {}
+    });
+
+    bot.action(['cb_shop', 'vip_info'], async (ctx) => {
+        try {
+            await ctx.answerCbQuery().catch(()=>{});
+            
+            const msg = `⭐️ <b>Telegram Yulduzlari orqali VIP xarid qilish!</b>\n\nVIP bo'lish orqali barcha kinolarni cheklovlarsiz yuklab olishingiz mumkin.\n\n<i>Iltimos, o'zingizga kerakli VIP muddatini tanlang:</i>`;
+            
+            await ctx.reply(msg, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('⭐️ 1 Oylik VIP (50 ⭐)', 'buy_stars_30')],
+                    [Markup.button.callback('⭐️ 1 Yillik VIP (300 ⭐)', 'buy_stars_365')],
+                    [Markup.button.callback('❌ Bekor qilish', 'cancel_pay')]
+                ])
+            });
+        } catch (e) {}
+    });
+
+    bot.action(/^buy_stars_(\d+)$/, async (ctx) => {
+        try {
+            await ctx.answerCbQuery().catch(()=>{});
+            const days = parseInt(ctx.match[1]);
+            let amount = days === 30 ? 50 : 300; // Telegram Stars prices
+            let title = days === 30 ? '1 Oylik VIP' : '1 Yillik VIP';
+            let description = `Kino bot uchun ${title} obunasi xarid qilish.`;
+            let payload = `vip_stars_${days}_${ctx.from.id}`;
+            
+            await ctx.replyWithInvoice({
+                title: title,
+                description: description,
+                payload: payload,
+                provider_token: "", // Empty for Telegram Stars
+                currency: "XTR",
+                prices: [{ label: title, amount: amount }]
+            });
+        } catch(e) {
+            logger.error('Stars invoice err:', e);
+        }
+    });
+
+    bot.action('cancel_pay', async (ctx) => {
+        try {
+            await ctx.answerCbQuery().catch(()=>{});
+            await ctx.deleteMessage().catch(()=>{});
+        } catch (e) {}
+    });
+
+    bot.on('pre_checkout_query', async (ctx) => {
+        try {
+            await ctx.answerPreCheckoutQuery(true).catch(()=>{});
+        } catch(e) {}
+    });
+
+    bot.on('successful_payment', async (ctx) => {
+        try {
+            const payload = ctx.message.successful_payment.invoice_payload;
+            if (payload && payload.startsWith('vip_stars_')) {
+                const parts = payload.split('_');
+                const days = parseInt(parts[2]);
+                const targetId = parseInt(parts[3]);
+                
+                if (ctx.from.id === targetId) {
+                    const user = await User.findOne({ telegramId: targetId });
+                    if (user) {
+                        const currentVip = user.vipUntil && new Date(user.vipUntil) > new Date() ? new Date(user.vipUntil) : new Date();
+                        currentVip.setDate(currentVip.getDate() + days);
+                        user.vipUntil = currentVip;
+                        await user.save();
+                        
+                        await ctx.reply(`🎉 <b>Tabriklaymiz! To'lov Muvaffaqiyatli!</b>\n\nSiz <b>${ctx.message.successful_payment.total_amount} ⭐️ Telegram Yulduzi</b> evaziga botimizdan ${days} kunlik VIP ni xarid qildingiz!\n💎 VIP ${currentVip.toISOString().split('T')[0]} sanasiga qadar amal qiladi. Siz bilan ishlashdan xursandmiz!`, { parse_mode: 'HTML' });
+                    }
+                }
+            }
+        } catch (e) {
+            logger.error('successful_payment err:', e);
+        }
+    });
+
+    bot.action('cb_leaderboard', async (ctx) => {
+        try {
+            await ctx.answerCbQuery('Reyting hisoblanmoqda...').catch(()=>{});
+            const topUsers = await User.find({ isBanned: false }).sort({ moviesWatched: -1 }).limit(10);
+            
+            let msg = `🏆 <b>FilmXBot Liderlar Taxtasi (Top 10)</b>\n\n`;
+            msg += `<i>Eng ko'p va faol kino ko'rib kelayotgan foydalanuvchilar:</i>\n\n`;
+            
+            topUsers.forEach((u, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎗';
+                const name = (u.firstName || 'Foydalanuvchi').replace(/</g, '').replace(/>/g, ''); // html himoya
+                msg += `${medal} <b>${name}</b> — 🎬 ${u.moviesWatched || 0} ta kino\n`;
+            });
+            
+            msg += `\n🛒 <i>Boshqalardan orqada qolmang va eng ko'p kinolarni tomosha qilib reyting cho'qqisiga chiqing!</i>`;
+            
+            await ctx.reply(msg, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Yopish', 'cb_close_msg')]])
+            });
+        } catch (e) {
+             logger.error('cb_leaderboard err:', e);
+        }
+    });
+
+    bot.action('cb_close_msg', async (ctx) => {
+         await ctx.deleteMessage().catch(()=>{});
+    });
+
+    bot.action('cb_stats', async (ctx) => {
+        try {
+            await ctx.answerCbQuery().catch(() => {});
+            const user = await User.findOne({ telegramId: ctx.from.id });
+            const isVip = user && user.vipUntil && new Date(user.vipUntil) > new Date();
+            const favCount = await Favorite.countDocuments({ user: user._id }).catch(() => 0);
+
+            let msg = `📊 <b>Statistika</b>\n\n`;
+            msg += `👤 <b>Ism:</b> ${user.firstName}\n`;
+            msg += `❤️ <b>Sevimlilar:</b> ${favCount} ta\n`;
+            msg += `🎬 <b>Ko'rilgan kinolar:</b> ${user.moviesWatched || 0} ta\n\n`;
+            
+            if (!isVip) {
+                msg += `<i>💎 VIP so'zini tanlang va qo'shimcha imkoniyatlarni oling!</i>`;
+                await ctx.reply(msg, { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('💎 VIP Olish', 'vip_info')]]) });
+            } else {
+                await ctx.reply(msg, { parse_mode: 'HTML' });
+            }
+        } catch (e) { }
+    });
+
+    bot.action('cb_fav', async (ctx) => {
+        try {
+            const dbUser = await getUserByTelegramId(ctx.from.id);
+            const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+
+            if (!isVip) return ctx.answerCbQuery(ctx.t('vip_restricted_fav'), { show_alert: true });
+            
+            await ctx.answerCbQuery().catch(() => {});
+            const favorites = await Favorite.find({ user: dbUser._id }).populate('movie');
+            if (!favorites || favorites.length === 0) return ctx.reply('📭 <b>Bo\'sh</b>', { parse_mode: 'HTML' });
+
+            let msg = '⭐ <b>Sevimlilar ro\'yxati:</b>\n\n';
+            favorites.forEach((f, i) => {
+                if (f.movie) msg += `${i + 1}. 🎬 ${f.movie.title} — <code>${f.movie.code}</code>\n`;
+            });
+            await ctx.replyWithHTML(msg);
+        } catch (e) { }
+    });
+
+    bot.action('cb_history', async (ctx) => {
+        try {
+            const dbUser = await User.findOne({ telegramId: ctx.from.id }).populate({ path: 'watchHistory.movie', select: 'title code' });
+            const isVip = dbUser && dbUser.vipUntil && new Date(dbUser.vipUntil) > new Date();
+
+            if (!isVip) return ctx.answerCbQuery(ctx.t('vip_restricted'), { show_alert: true });
+            
+            await ctx.answerCbQuery().catch(() => {});
+            if (!dbUser || !dbUser.watchHistory || dbUser.watchHistory.length === 0) return ctx.reply('📭 Bo\'sh');
+
+            const history = dbUser.watchHistory.slice().reverse();
+            let msg = '📜 <b>Mening Tarixim</b>\n\n';
+            history.forEach((h, i) => {
+                if (h.movie) msg += `${i + 1}. 🎬 ${h.movie.title} — <code>${h.movie.code}</code>\n`;
+            });
+            await ctx.replyWithHTML(msg);
+        } catch (e) { }
+    });
+
+    bot.action('cb_vip', async (ctx) => {
+        try {
+            const user = await getUserByTelegramId(ctx.from.id);
+            if (user && user.vipUntil && new Date(user.vipUntil) > new Date()) {
+                const diff = new Date(user.vipUntil) - new Date();
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                ctx.answerCbQuery(`⏳ VIP: ${days} kun, ${hours} soat qoldi`, { show_alert: true });
+            } else {
+                ctx.answerCbQuery('Muddati tugagan', { show_alert: true });
+            }
+        } catch (e) { }
     });
 
     // Handle Web App Data response

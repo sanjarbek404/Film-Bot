@@ -12,6 +12,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    bannedUntil: {
+        type: Date,
+        default: null,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
@@ -21,12 +25,16 @@ const userSchema = new mongoose.Schema({
         default: null,
     },
     vipAddedBy: {
-        type: String, // Admin ID or 'admin'
+        type: String,
         default: null,
     },
     vipAddedAt: {
         type: Date,
         default: null,
+    },
+    vipNotified: {
+        type: Boolean,
+        default: false,
     },
     moviesWatched: {
         type: Number,
@@ -81,7 +89,7 @@ const userSchema = new mongoose.Schema({
         default: 0
     },
     invitedBy: {
-        type: String, // Telegram ID of referrer
+        type: String,
         default: null
     },
     lastBroadcastMsgId: {
@@ -93,6 +101,7 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 
 User.collection.createIndex({ telegramId: 1 }).catch(()=>{});
+User.collection.createIndex({ isBanned: 1 }).catch(()=>{});
 User.collection.createIndex({ points: -1 }).catch(()=>{});
 User.collection.createIndex({ moviesWatched: -1 }).catch(()=>{});
 

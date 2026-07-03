@@ -1,21 +1,26 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './src/config/db.js';
 import bot from './src/bot/bot.js';
 import { getTopMovies } from './src/services/movieService.js';
 
 dotenv.config();
 
-// Main startup function
 const startBot = async () => {
     try {
         const app = express();
         const PORT = process.env.PORT || 3000;
         
-        // Attempt DB Connection in background, don't crash the server if it fails
-        connectDB()
-            .then(() => console.log('✅ Database connected'))
-            .catch(err => console.error('❌ Database connection failed:', err.message));
+        // Wait for DB Connection before starting bot
+        try {
+            await connectDB();
+            console.log('✅ Database connected');
+        } catch (err) {
+            console.error('❌ Database connection failed:', err.message);
+            console.error('⚠️ Bot will start but DB features may not work');
+        }
 
         // Add Commands definition
         try {
@@ -36,23 +41,27 @@ const startBot = async () => {
             res.json({ status: 'ok', timestamp: new Date() });
         });
 
-        // Setup CORS and Headers for WebApp
         app.use((req, res, next) => {
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
             next();
         });
 
-        // Setup WebApp Static Files with Caching
         app.use('/webapp', express.static('public', {
-            maxAge: '1d', // Cache static assets for 1 day
-            setHeaders: (res, path) => {
-                if (express.static.mime.lookup(path) === 'text/html') {
-                    // Custom Cache-Control for HTML files
+            maxAge: '1d',
+            setHeaders: (res, pathStr) => {
+                if (pathStr.endsWith('.html')) {
                     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
                 }
             }
         }));
+
+        // SPA Fallback for Web App
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        app.get('/webapp/*', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        });
         
         app.get('/api/image/:fileId', async (req, res) => {
             try {
@@ -65,7 +74,6 @@ const startBot = async () => {
 
         app.get('/api/movies', async (req, res) => {
             try {
-                // Fetch top 100 movies for the Web App catalog
                 const movies = await getTopMovies(100);
                 res.json(movies);
             } catch (e) {
@@ -73,11 +81,9 @@ const startBot = async () => {
             }
         });
 
-        // Setup Webhook or Long Polling based on Environment
         const domain = process.env.RENDER_EXTERNAL_URL;
         
         if (domain) {
-            // Render specific: Use Webhooks
             const webhookPath = `/telegraf/${bot.secretPathComponent()}`;
             app.use(bot.webhookCallback(webhookPath));
             
@@ -91,7 +97,6 @@ const startBot = async () => {
                 }
             });
         } else {
-            // Local fallback: Long Polling
             app.listen(PORT, () => {
                 console.log(`🌐 Server (Polling) running on port ${PORT}`);
             });
@@ -109,20 +114,15 @@ const startBot = async () => {
     }
 };
 
-// Start the application
 startBot();
 
-// Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-// Prevent Crash on Unhandled Errors
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
-    // Don't exit, keep running
 });
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    // Don't exit, keep running
 });

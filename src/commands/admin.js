@@ -16,8 +16,8 @@ export const setupAdminCommands = (bot) => {
             // Super Admin (Env)
             if (ctx.from?.id && isAdmin(ctx.from.id)) return true;
 
-            // Database Admin
-            const user = await User.findOne({ telegramId: ctx.from.id });
+            // Database Admin (Session'dan tekshirish — qo'shimcha DB so'rov YO'Q)
+            const user = ctx.session?.user;
             if (user && (user.role === 'admin' || user.role === 'superadmin')) return true;
 
             return false;

@@ -65,6 +65,13 @@ function App() {
   const topMovies = useMemo(() => [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 15), [movies]);
   const featuredMovie = useMemo(() => topMovies.length > 0 ? topMovies[0] : null, [topMovies]);
 
+  const featuredTitle = useMemo(() => {
+    if (!featuredMovie) return '';
+    return featuredMovie.title && !featuredMovie.title.startsWith('Kino #') 
+      ? featuredMovie.title 
+      : `Kino #${featuredMovie.code}`;
+  }, [featuredMovie]);
+
   const getEpisodeNumber = (title) => {
     if (!title) return null;
     const match = title.match(/- (\d+)-qism/i);
@@ -87,19 +94,22 @@ function App() {
         className="flex-none w-32 md:w-40 flex flex-col relative group cursor-pointer snap-start gap-1.5"
         onClick={() => handleSelect(movie)}
       >
-        <div className="relative overflow-hidden rounded-xl shadow-lg border border-white/5 bg-gray-900 aspect-[2/3] w-full">
-          <img src={imgUrl} alt="Movie" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Play className="w-10 h-10 text-white opacity-80" />
+        <div className="relative overflow-hidden rounded-2xl shadow-xl border border-white/10 bg-zinc-900 aspect-[2/3] w-full">
+          <img src={imgUrl} alt="Movie" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center backdrop-blur-[2px]">
+            <div className="w-12 h-12 rounded-full bg-red-600/90 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.6)] transform scale-75 group-hover:scale-100 transition-transform duration-300">
+              <Play className="w-5 h-5 text-white ml-1" />
+            </div>
           </div>
           {/* Top Badges */}
-          <div className="absolute top-1 right-1 flex flex-col gap-1 items-end">
-            <div className="bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-white flex items-center gap-1 border border-white/10 shadow-md">
+          <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end">
+            <div className="bg-black/40 backdrop-blur-xl px-2 py-1 rounded-lg text-[10px] font-bold text-white/90 flex items-center gap-1 border border-white/20 shadow-lg">
               <Hash className="w-3 h-3 text-red-500" />
               {movie.code}
             </div>
             {episode && (
-              <div className="bg-red-600/90 backdrop-blur-md px-2 py-0.5 rounded text-[11px] font-extrabold text-white shadow-lg border border-red-500/50">
+              <div className="bg-red-600/90 backdrop-blur-xl px-2.5 py-1 rounded-lg text-[10px] font-black text-white shadow-[0_0_15px_rgba(220,38,38,0.5)] border border-red-400/30">
                 {episode}-QISM
               </div>
             )}
@@ -107,8 +117,8 @@ function App() {
         </div>
         
         {/* Title below poster */}
-        <div className="px-0.5">
-          <h3 className="text-gray-200 text-xs md:text-sm font-semibold truncate w-full" title={displayTitle}>
+        <div className="px-1 pt-0.5">
+          <h3 className="text-gray-100 text-sm font-medium truncate w-full group-hover:text-red-400 transition-colors" title={displayTitle}>
             {displayTitle}
           </h3>
         </div>
@@ -131,18 +141,18 @@ function App() {
               <Search className="absolute left-3 w-5 h-5 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="Kod yoki nom bilan qidiring..." 
+                placeholder="Kod yoki nom bilan izlang..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => setIsSearchActive(true)}
-                className="w-full bg-zinc-900/80 border border-zinc-700 text-white text-sm rounded-lg pl-10 pr-10 py-2.5 focus:outline-none focus:border-gray-500 focus:bg-zinc-800 transition-all"
+                className="w-full bg-white/10 backdrop-blur-xl border border-white/20 text-white text-sm rounded-2xl pl-10 pr-10 py-2.5 focus:outline-none focus:border-red-500/50 focus:bg-white/15 focus:ring-2 focus:ring-red-500/30 transition-all shadow-xl placeholder-gray-400"
               />
               {(search || isSearchActive) && (
                 <button 
                   onClick={() => { setSearch(''); setIsSearchActive(false); }}
-                  className="absolute right-3 p-1 rounded-full bg-zinc-700/50 hover:bg-zinc-600"
+                  className="absolute right-3 p-1 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
                 >
-                  <X className="w-4 h-4 text-gray-300" />
+                  <X className="w-4 h-4 text-white/80" />
                 </button>
               )}
             </div>
@@ -193,24 +203,39 @@ function App() {
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent"></div>
               </div>
               
-              <div className="relative z-10 p-6 md:p-12 w-full max-w-5xl mx-auto">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm">TOP</span>
-                  <span className="text-xs text-gray-300">Eng ko'p ko'rilgan</span>
-                </div>
-                <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-4 drop-shadow-lg">
-                  Kino #{featuredMovie.code}
-                </h1>
+              <div className="relative z-10 p-6 md:p-12 w-full max-w-5xl mx-auto flex flex-col justify-end h-full">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="flex items-center gap-2 mb-3"
+                >
+                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wider shadow-[0_0_10px_rgba(220,38,38,0.5)]">TOP TAVSIYA</span>
+                </motion.div>
                 
-                <div className="flex gap-3">
+                <motion.h1 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-4xl md:text-6xl font-black text-white mb-6 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] leading-tight"
+                >
+                  {featuredTitle}
+                </motion.h1>
+                
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex gap-3"
+                >
                   <button 
                     onClick={() => handleSelect(featuredMovie)}
-                    className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded hover:bg-gray-200 transition font-bold"
+                    className="flex items-center justify-center gap-2 bg-white text-black px-8 py-3 rounded-full hover:bg-gray-200 hover:scale-105 active:scale-95 transition-all font-bold text-sm md:text-base shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                   >
                     <Play className="w-5 h-5 fill-black" />
                     Tomosha qilish
                   </button>
-                </div>
+                </motion.div>
               </div>
             </div>
           )}

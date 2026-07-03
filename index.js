@@ -56,10 +56,10 @@ const startBot = async () => {
             }
         }));
 
-        // SPA Fallback for Web App
+        // SPA Fallback for Web App (Express v5 compatible routing)
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);
-        app.get('/webapp/*', (req, res) => {
+        app.get('/webapp(.*)', (req, res) => {
             res.sendFile(path.join(__dirname, 'public', 'index.html'));
         });
         

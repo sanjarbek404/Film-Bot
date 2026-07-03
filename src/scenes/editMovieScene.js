@@ -42,7 +42,7 @@ const editMovieScene = new Scenes.WizardScene(
                     ...Markup.inlineKeyboard([
                         [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
                         [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                        [Markup.button.callback('🔙 Boshqa kino', 'back_to_start'), Markup.button.callback('❌ Tugatish', 'cancel_edit')]
                     ])
                 });
             } catch (e) {
@@ -51,7 +51,7 @@ const editMovieScene = new Scenes.WizardScene(
                     ...Markup.inlineKeyboard([
                         [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
                         [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                        [Markup.button.callback('🔙 Boshqa kino', 'back_to_start'), Markup.button.callback('❌ Tugatish', 'cancel_edit')]
                     ])
                 });
             }
@@ -103,7 +103,7 @@ const editMovieScene = new Scenes.WizardScene(
                     ...Markup.inlineKeyboard([
                         [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
                         [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                        [Markup.button.callback('🔙 Boshqa kino', 'back_to_start'), Markup.button.callback('❌ Tugatish', 'cancel_edit')]
                     ])
                 });
             } catch (e) {
@@ -112,7 +112,7 @@ const editMovieScene = new Scenes.WizardScene(
                     ...Markup.inlineKeyboard([
                         [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
                         [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                        [Markup.button.callback('🔙 Boshqa kino', 'back_to_start'), Markup.button.callback('❌ Tugatish', 'cancel_edit')]
                     ])
                 });
             }
@@ -174,7 +174,7 @@ editMovieScene.action('toggle_restrict', async (ctx) => {
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
                     [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                    [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                    [Markup.button.callback('🔙 Boshqa kino', 'back_to_start'), Markup.button.callback('❌ Tugatish', 'cancel_edit')]
                 ])
             });
         }
@@ -188,6 +188,17 @@ editMovieScene.action('cancel_edit', async (ctx) => {
     await ctx.deleteMessage().catch(() => { });
     await ctx.reply('✅ Tahrirlash yakunlandi.');
     return ctx.scene.leave();
+});
+
+editMovieScene.action('back_to_start', async (ctx) => {
+    await ctx.deleteMessage().catch(() => { });
+    await ctx.reply('✏️ <b>Kino Tahrirlash</b>\n\nTahrirlamoqchi bo\'lgan kinongiz kodini yuboring (masalan: 1001):', {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Bekor qilish', 'cancel_edit')]
+        ])
+    });
+    return ctx.wizard.selectStep(1);
 });
 
 export default editMovieScene;

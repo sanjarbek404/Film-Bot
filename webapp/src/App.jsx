@@ -60,8 +60,16 @@ function App() {
   const topMovies = useMemo(() => [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 15), [movies]);
   const featuredMovie = useMemo(() => topMovies.length > 0 ? topMovies[0] : null, [topMovies]);
 
+  const getEpisodeNumber = (title) => {
+    if (!title) return null;
+    const match = title.match(/- (\d+)-qism/i);
+    return match ? match[1] : null;
+  };
+
   const renderMovieCard = (movie, index) => {
     const imgUrl = movie.poster && movie.poster.startsWith('http') ? movie.poster : `/api/image/${movie.poster}`;
+    const episode = getEpisodeNumber(movie.title);
+    
     return (
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
@@ -78,9 +86,16 @@ function App() {
             <Play className="w-10 h-10 text-white opacity-80" />
           </div>
           {/* Top Badges */}
-          <div className="absolute top-1 right-1 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-white flex items-center gap-1 border border-white/10">
-            <Hash className="w-3 h-3 text-red-500" />
-            {movie.code}
+          <div className="absolute top-1 right-1 flex flex-col gap-1 items-end">
+            <div className="bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-white flex items-center gap-1 border border-white/10 shadow-md">
+              <Hash className="w-3 h-3 text-red-500" />
+              {movie.code}
+            </div>
+            {episode && (
+              <div className="bg-red-600/90 backdrop-blur-md px-2 py-0.5 rounded text-[11px] font-extrabold text-white shadow-lg border border-red-500/50">
+                {episode}-QISM
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

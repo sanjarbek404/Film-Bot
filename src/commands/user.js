@@ -35,27 +35,13 @@ export const sendMovie = async (ctx, movie, dbUser) => {
             return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         };
 
-        let cleanTitle = movie.title || '';
-        cleanTitle = cleanTitle.replace(/\s*\(?asilmedia\.net\)?\s*/gi, '').replace(/\s*\([^)]+\.[a-z]{2,4}\)\s*/gi, '').trim();
-
-        let caption = ctx.t('movie_found', {
-            title: escapeHTML(cleanTitle),
-            year: movie.year || 'N/A',
-            genre: escapeHTML(Array.isArray(movie.genres) ? movie.genres.join(', ') : (movie.genre || 'N/A')),
-            rating: movie.averageRating || '0.0',
-            views: views
-        });
-
-        if (movie.description) {
-            let desc = movie.description.length > 350 ? movie.description.substring(0, 350) + '...' : movie.description;
-            caption += `\n📝 ${escapeHTML(desc)}\n`;
-        }
+        let caption = `🎬 <b>Kino kodi:</b> ${movie.code}\n👁 <b>Ko'rishlar:</b> ${views}`;
 
         let buttons = [];
 
         // 💎 VIP HIMOYA: Faqat VIP foydalanuvchilar yuklab olishi/uzatishi mumkin
         if (!isVip) {
-            caption += `\n\n🔒 <i>Kinoni yuklab olish va uzatish uchun VIP obuna sotib oling!</i>`;
+            caption += `\n\n🔒 <i>Kinoni saqlash va uzatish faqat VIP obunachilar uchun.</i>`;
             buttons.push([Markup.button.callback('💎 VIP Olish', 'vip_info')]);
         }
 

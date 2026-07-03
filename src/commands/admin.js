@@ -666,7 +666,7 @@ export const setupAdminCommands = (bot) => {
 
             const user = await User.findOneAndUpdate(
                 { telegramId },
-                { isBanned: false },
+                { isBanned: false, bannedUntil: null },
                 { new: true }
             );
             if (user) {
@@ -683,6 +683,16 @@ export const setupAdminCommands = (bot) => {
         } catch (e) {
             logger.error('Unban error:', e);
             ctx.reply('❌ Xatolik yuz berdi.').catch(() => { });
+        }
+    });
+
+    bot.command('unbanall', async (ctx) => {
+        if (!await adminCheck(ctx)) return;
+        try {
+            const res = await User.updateMany({ isBanned: true }, { isBanned: false, bannedUntil: null });
+            ctx.reply(`✅ <b>Barcha foydalanuvchilar blokdan chiqarildi!</b>\n\nJami: ${res.modifiedCount} ta foydalanuvchi.`, { parse_mode: 'HTML' });
+        } catch (e) {
+            ctx.reply('❌ Xatolik yuz berdi.');
         }
     });
 

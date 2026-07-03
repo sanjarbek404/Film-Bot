@@ -65,8 +65,23 @@ const startBot = async () => {
         
         app.get('/api/image/:fileId', async (req, res) => {
             try {
-                const link = await bot.telegram.getFileLink(req.params.fileId);
-                res.redirect(link.href);
+                const fileId = req.params.fileId;
+                if (fileId.startsWith('http')) {
+                    return res.redirect(fileId);
+                }
+                const link = await bot.telegram.getFileLink(fileId);
+                
+                const https = await import('https');
+                https.get(link.href, (response) => {
+                    if (response.statusCode !== 200) {
+                        return res.status(404).send('Not found');
+                    }
+                    res.set('Content-Type', response.headers['content-type']);
+                    res.set('Cache-Control', 'public, max-age=864000'); // Cache for 10 days
+                    response.pipe(res);
+                }).on('error', () => {
+                    res.status(500).send('Proxy error');
+                });
             } catch (e) {
                 res.status(404).send('Image not found');
             }

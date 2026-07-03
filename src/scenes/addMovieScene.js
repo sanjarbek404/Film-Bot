@@ -3,6 +3,8 @@ import logger from '../utils/logger.js';
 import { createMovie } from '../services/movieService.js';
 import Movie from '../models/Movie.js';
 import Config from '../models/Config.js';
+import { analyzePosterWithAI } from '../services/aiService.js';
+import fetch from 'node-fetch';
 
 // Auto-generate unique movie code
 const generateMovieCode = async () => {
@@ -16,13 +18,13 @@ const generateMovieCode = async () => {
 
 const addMovieScene = new Scenes.WizardScene(
     'ADD_MOVIE_SCENE',
-    // Step 1: Ask for title
+    // Step 0: Start and Ask for Poster or Title
     async (ctx) => {
         try {
             const nextCode = await generateMovieCode();
             ctx.wizard.state.autoCode = nextCode;
 
-            await ctx.reply(`🎬 <b>Kino qo'shish</b>\n\n📝 Kino nomini kiriting:\n\n<i>Kino kodi avtomatik: <code>${nextCode}</code></i>`, {
+            await ctx.reply(`🎬 <b>Kino qo'shish</b>\n\nAI Avtomatik to'ldirishi uchun kino <b>POSTERINI (rasmini)</b> yuboring.\n\nYoki qo'lda qo'shish uchun kino nomini yozib yuboring.\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
@@ -30,24 +32,64 @@ const addMovieScene = new Scenes.WizardScene(
             });
             return ctx.wizard.next();
         } catch (e) {
-            logger.error('Add movie step 1 error:', e);
+            logger.error('Add movie step 0 error:', e);
             await ctx.reply('❌ Xatolik yuz berdi.').catch(() => { });
             return ctx.scene.leave();
         }
     },
-    // Step 2: Ask for Year
+    // Step 1: Process Poster or Title
     async (ctx) => {
         try {
-            if (!ctx.message?.text) return ctx.reply('⚠️ Iltimos, matn kiriting.');
-            ctx.wizard.state.title = ctx.message.text;
-            await ctx.reply('📅 Kino yilini kiriting (masalan: 2024):');
-            return ctx.wizard.next();
+            if (ctx.message?.photo) {
+                // AI Flow
+                const waitMsg = await ctx.reply('🤖 <i>Rasm AI orqali tahlil qilinmoqda, kutib turing...</i>', { parse_mode: 'HTML' });
+                
+                try {
+                    // Get highest resolution photo
+                    const photo = ctx.message.photo[ctx.message.photo.length - 1];
+                    ctx.wizard.state.poster = photo.file_id;
+                    
+                    const link = await ctx.telegram.getFileLink(photo.file_id);
+                    const imgRes = await fetch(link.href);
+                    const buffer = Buffer.from(await imgRes.arrayBuffer());
+                    
+                    const aiData = await analyzePosterWithAI(buffer);
+                    
+                    if (aiData && aiData.title) {
+                        ctx.wizard.state.title = aiData.title;
+                        ctx.wizard.state.year = aiData.year || new Date().getFullYear();
+                        ctx.wizard.state.genre = aiData.genre || 'Boshqa';
+                        ctx.wizard.state.description = aiData.description || 'Tez orada...';
+                        
+                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, 
+                            `✅ <b>AI kinoni aniqladi!</b>\n\n🎬 Nom: ${aiData.title}\n📅 Yil: ${aiData.year}\n🎭 Janr: ${aiData.genre}\n📝 Tavsif: ${aiData.description}\n\n📥 Endi kino <b>VIDEOSINI</b> yuboring (yoki havola tashlang):`, 
+                            { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Bekor qilish', 'cancel_add')]]) }
+                        );
+                        
+                        ctx.wizard.selectStep(5); // Jump to video step
+                        return;
+                    } else {
+                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚠️ AI rasmni taniy olmadi. Iltimos, kino nomini qo\'lda kiriting:');
+                        return; // Stay on step 1 to expect text
+                    }
+                } catch (err) {
+                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚠️ AI xizmatida xatolik yoki API kalit yo\'q. Kino nomini qo\'lda kiriting:');
+                    return; // Stay on step 1 to expect text
+                }
+            } else if (ctx.message?.text) {
+                // Manual Flow
+                ctx.wizard.state.title = ctx.message.text;
+                await ctx.reply('📅 Kino yilini kiriting (masalan: 2024):');
+                return ctx.wizard.next();
+            } else {
+                return ctx.reply('⚠️ Iltimos, rasm yoki kino nomini yuboring.');
+            }
         } catch (e) {
-            logger.error('Add movie step 2 error:', e);
+            logger.error('Add movie step 1 error:', e);
             return ctx.scene.leave();
         }
     },
-    // Step 3: Ask for Genre
+    // Step 2: Ask for Genre (Manual Flow)
     async (ctx) => {
         try {
             if (!ctx.message?.text) return ctx.reply('⚠️ Iltimos, yilni kiriting.');
@@ -65,11 +107,11 @@ const addMovieScene = new Scenes.WizardScene(
             ]));
             return ctx.wizard.next();
         } catch (e) {
-            logger.error('Add movie step 3 error:', e);
+            logger.error('Add movie step 2 error:', e);
             return ctx.scene.leave();
         }
     },
-    // Step 4: Wait for genre selection
+    // Step 3: Wait for genre selection (Manual Flow)
     async (ctx) => {
         try {
             if (ctx.message?.text) {
@@ -78,22 +120,65 @@ const addMovieScene = new Scenes.WizardScene(
                 return ctx.wizard.next();
             }
         } catch (e) {
-            logger.error('Add movie step 4 error:', e);
+            logger.error('Add movie step 3 error:', e);
         }
     },
-    // Step 5: Ask for video
+    // Step 4: Ask for video (Manual Flow)
     async (ctx) => {
         try {
             if (!ctx.message?.text) return ctx.reply('⚠️ Iltimos, tavsif kiriting.');
             ctx.wizard.state.description = ctx.message.text;
-            await ctx.reply('📥 Kino videosini yuboring:\n\n<i>Video fayl yoki havola yuborishingiz mumkin</i>', { parse_mode: 'HTML' });
-            return ctx.wizard.next();
+            
+            if (!ctx.wizard.state.poster) {
+                await ctx.reply('🖼️ Endi kino posterini (rasmini) yuboring:');
+                return ctx.wizard.next(); // Go to Step 4b (which is Step 5 index, wait I need to adjust steps!)
+            }
+        } catch (e) {
+            logger.error('Add movie step 4 error:', e);
+            return ctx.scene.leave();
+        }
+    },
+    // Step 5: Ask for poster if manual, OR receive video if AI
+    async (ctx) => {
+        try {
+            // Manual flow expects POSTER here. AI flow expects VIDEO here.
+            if (ctx.wizard.state.poster) {
+                // AI FLOW: We already have poster, so this is VIDEO!
+                if (ctx.message?.video) {
+                    ctx.wizard.state.fileId = ctx.message.video.file_id;
+                } else if (ctx.message?.document) {
+                    ctx.wizard.state.fileId = ctx.message.document.file_id;
+                } else if (ctx.message?.text) {
+                    ctx.wizard.state.link = ctx.message.text;
+                } else {
+                    return ctx.reply('⚠️ Iltimos, video yoki havola yuboring.');
+                }
+                
+                // Go straight to Restrictions
+                await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino VIP foydalanuvchilar tomonidan yuklab olinishi mumkinmi, yoki qat\'iy himoyalansinmi?', {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🔓 Standart (VIP yuklay oladi)', 'restrict_false')],
+                        [Markup.button.callback('🔐 Qat\'iy himoya (Faqat ko\'rish)', 'restrict_true')],
+                        [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
+                    ])
+                });
+                ctx.wizard.selectStep(7); // Jump to Save step
+                return;
+            } else {
+                // MANUAL FLOW: We expect POSTER here
+                if (!ctx.message?.photo) return ctx.reply('⚠️ Iltimos, rasm yuboring.');
+                ctx.wizard.state.poster = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                
+                await ctx.reply('📥 Endi Kino videosini yuboring:\n\n<i>Video fayl yoki havola yuborishingiz mumkin</i>', { parse_mode: 'HTML' });
+                return ctx.wizard.next(); // Go to Step 6
+            }
         } catch (e) {
             logger.error('Add movie step 5 error:', e);
             return ctx.scene.leave();
         }
     },
-    // Step 6: Ask for poster
+    // Step 6: Receive Video (Manual Flow)
     async (ctx) => {
         try {
             if (ctx.message?.video) {
@@ -106,24 +191,7 @@ const addMovieScene = new Scenes.WizardScene(
                 return ctx.reply('⚠️ Iltimos, video yoki havola yuboring.');
             }
 
-            await ctx.reply('🖼️ Kino posterini (rasm) yuboring:');
-            return ctx.wizard.next();
-        } catch (e) {
-            logger.error('Add movie step 6 error:', e);
-            return ctx.scene.leave();
-        }
-    },
-    // Step 7: Ask for Restriction
-    async (ctx) => {
-        try {
-            if (!ctx.message?.photo) {
-                return ctx.reply('⚠️ Iltimos, rasm yuboring.');
-            }
-
-            // Get highest resolution photo
-            ctx.wizard.state.poster = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-
-            await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino VIP foydalanuvchilar tomonidan yuklab olinishi mumkinmi, yoki qat\'iy himoyalansinmi (hech kim yuklay olmaydi)?', {
+            await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino VIP foydalanuvchilar tomonidan yuklab olinishi mumkinmi, yoki qat\'iy himoyalansinmi?', {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('🔓 Standart (VIP yuklay oladi)', 'restrict_false')],
@@ -134,11 +202,11 @@ const addMovieScene = new Scenes.WizardScene(
             return ctx.wizard.next();
 
         } catch (e) {
-            logger.error('Add movie step 7 error:', e);
+            logger.error('Add movie step 6 error:', e);
             return ctx.scene.leave();
         }
     },
-    // Step 8: Save
+    // Step 7: Save
     async (ctx) => {
         try {
             if (ctx.callbackQuery) {
@@ -160,7 +228,6 @@ const addMovieScene = new Scenes.WizardScene(
 
             const movie = await createMovie(movieData);
 
-            // Success msg to Admin with looping button
             await ctx.replyWithPhoto(movie.poster, {
                 caption: `✅ <b>Kino muvaffaqiyatli saqlandi!</b>\n\n🎬 Nom: ${movie.title}\n📅 Yil: ${movie.year}\n🎭 Janr: ${movie.genre}\n🔢 Kod: <code>${movie.code}</code>\n🔒 VIP Himoya: ${movie.isRestricted ? "Qat'iy" : "Standart"}\n\n<i>Kino kanalga va barcha foydalanuvchilarga yuborilmoqda...</i>`,
                 parse_mode: 'HTML',
@@ -251,7 +318,7 @@ addMovieScene.action('add_another_movie', async (ctx) => {
         }
         ctx.wizard.state.autoCode = nextCode;
         
-        await ctx.reply(`🎬 <b>Kino qo'shish jarayoni yana davom etmoqda:</b>\n\n📝 Navbatdagi kino nomini kiriting:\n\n<i>Kino kodi avtomatik: <code>${nextCode}</code></i>`, {
+        await ctx.reply(`🎬 <b>Kino qo'shish jarayoni yana davom etmoqda:</b>\n\nAI Avtomatik to'ldirishi uchun kino <b>POSTERINI (rasmini)</b> yuboring.\n\nYoki qo'lda qo'shish uchun kino nomini yozib yuboring.\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]

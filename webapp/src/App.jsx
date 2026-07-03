@@ -50,10 +50,15 @@ function App() {
     }, 1200);
   };
 
-  const filteredMovies = movies.filter(m => m && (
-    (m.title && m.title.toLowerCase().includes(search.toLowerCase())) || 
-    (m.code && m.code.toString().includes(search))
-  ));
+  const filteredMovies = useMemo(() => {
+    if (!search) return [];
+    const term = search.toLowerCase();
+    const results = movies.filter(m => m && (
+      (m.title && m.title.toLowerCase().includes(term)) || 
+      (m.code && m.code.toString().includes(term))
+    ));
+    return results.slice(0, 40); // 40 tadan ko'pini ko'rsatmaymiz (qotib qolmasligi uchun)
+  }, [movies, search]);
 
   // Compute categories
   const newMovies = useMemo(() => [...movies].reverse().slice(0, 15), [movies]);
@@ -70,6 +75,8 @@ function App() {
     const imgUrl = movie.poster && movie.poster.startsWith('http') ? movie.poster : `/api/image/${movie.poster}`;
     const episode = getEpisodeNumber(movie.title);
     
+    const displayTitle = movie.title && !movie.title.startsWith('Kino #') ? movie.title : `Kino #${movie.code}`;
+    
     return (
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
@@ -77,10 +84,10 @@ function App() {
         transition={{ delay: index * 0.05 }}
         whileTap={{ scale: 0.95 }}
         key={movie._id || movie.code} 
-        className="flex-none w-32 md:w-40 flex flex-col relative group cursor-pointer snap-start"
+        className="flex-none w-32 md:w-40 flex flex-col relative group cursor-pointer snap-start gap-1.5"
         onClick={() => handleSelect(movie)}
       >
-        <div className="relative overflow-hidden rounded-xl shadow-lg border border-white/5 bg-gray-900 aspect-[2/3]">
+        <div className="relative overflow-hidden rounded-xl shadow-lg border border-white/5 bg-gray-900 aspect-[2/3] w-full">
           <img src={imgUrl} alt="Movie" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <Play className="w-10 h-10 text-white opacity-80" />
@@ -97,6 +104,13 @@ function App() {
               </div>
             )}
           </div>
+        </div>
+        
+        {/* Title below poster */}
+        <div className="px-0.5">
+          <h3 className="text-gray-200 text-xs md:text-sm font-semibold truncate w-full" title={displayTitle}>
+            {displayTitle}
+          </h3>
         </div>
       </motion.div>
     );

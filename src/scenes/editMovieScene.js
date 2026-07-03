@@ -34,15 +34,27 @@ const editMovieScene = new Scenes.WizardScene(
                 `5. ❌ Tugatish\n\n` +
                 `Hozirgi himoya: ${movie.isRestricted ? "🔐 Qat'iy (VIP ham yuklay olmaydi)" : "🔓 Standart (VIP yuklay oladi)"}`;
 
-            await ctx.replyWithPhoto(movie.poster, {
-                caption: msg,
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
-                    [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                    [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
-                ])
-            });
+            try {
+                if (!movie.poster) throw new Error('No poster');
+                await ctx.replyWithPhoto(movie.poster, {
+                    caption: msg,
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
+                        [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
+                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                    ])
+                });
+            } catch (e) {
+                await ctx.reply(msg, {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
+                        [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
+                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                    ])
+                });
+            }
             return ctx.wizard.next();
         }
     },
@@ -83,15 +95,27 @@ const editMovieScene = new Scenes.WizardScene(
                 `5. ❌ Tugatish\n\n` +
                 `Hozirgi himoya: ${movie.isRestricted ? "🔐 Qat'iy (VIP ham yuklay olmaydi)" : "🔓 Standart (VIP yuklay oladi)"}`;
 
-            await ctx.replyWithPhoto(movie.poster, {
-                caption: msg,
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
-                    [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
-                    [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
-                ])
-            });
+            try {
+                if (!movie.poster) throw new Error('No poster');
+                await ctx.replyWithPhoto(movie.poster, {
+                    caption: msg,
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
+                        [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
+                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                    ])
+                });
+            } catch (e) {
+                await ctx.reply(msg, {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🏷 Nomi', 'edit_title'), Markup.button.callback('🖼 Poster', 'edit_poster')],
+                        [Markup.button.callback('📝 Tavsif', 'edit_desc'), Markup.button.callback(movie.isRestricted ? '🔓 Yechish' : '🔐 Qulflash', 'toggle_restrict')],
+                        [Markup.button.callback('❌ Chiqish', 'cancel_edit')]
+                    ])
+                });
+            }
 
             // Go back to Step 2 (Wait state)
             return ctx.wizard.selectStep(2);

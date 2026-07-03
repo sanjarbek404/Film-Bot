@@ -28,6 +28,8 @@ const vipPromoMessages = [
     "🎬 <b>Yangi kinolarni birinchilardan bo'lib ko'ring!</b>\n\n💎 VIP foydalanuvchilar uchun eksklyuziv imkoniyatlar.",
 ];
 
+const globalAdminSet = new Set(); // Xotirada adminlarni saqlash uchun (Spam-filtrdan o'tkazmaslik uchun)
+
 export const authMiddleware = async (ctx, next) => {
     if (!ctx.from) return next();
 
@@ -35,9 +37,12 @@ export const authMiddleware = async (ctx, next) => {
     const now = Date.now();
 
     // ══════════ ADMIN BYPASS — Admin tekshiruvlarni o'tkazib yuboradi ══════════
-    if (isAdmin(userId)) {
+    if (isAdmin(userId) || globalAdminSet.has(userId)) {
         try {
             const user = await findOrCreateUser(ctx);
+            if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+                globalAdminSet.add(userId);
+            }
             if (!ctx.session) ctx.session = {};
             ctx.session.user = user;
             ctx.t = (key, params = {}) => getTranslation(user?.language || 'uz', key, params);
@@ -106,10 +111,14 @@ export const authMiddleware = async (ctx, next) => {
     try {
         const user = await findOrCreateUser(ctx);
 
+        if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+            globalAdminSet.add(userId);
+        }
+
         // Bloklangan foydalanuvchi tekshiruvi (avtomatik blokdan chiqarish bilan)
         if (user && user.isBanned) {
-            if (user.bannedUntil && new Date(user.bannedUntil) <= new Date()) {
-                // Muddati tugagan — avtomatik blokdan chiqarish
+            if (user.bannedUntil && new Date(user.bannedUntil) <= new Date() || globalAdminSet.has(userId)) {
+                // Muddati tugagan (yoki u admin ekanligi aniqlangan) — avtomatik blokdan chiqarish
                 user.isBanned = false;
                 user.bannedUntil = null;
                 await user.save();

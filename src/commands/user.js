@@ -35,7 +35,11 @@ export const sendMovie = async (ctx, movie, dbUser) => {
             return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         };
 
-        let caption = `🎬 <b>Kino kodi:</b> ${movie.code}\n👁 <b>Ko'rishlar:</b> ${views}`;
+        let caption = '';
+        if (movie.title && !movie.title.startsWith('Kino #')) {
+            caption += `🎬 <b>${escapeHTML(movie.title)}</b>\n\n`;
+        }
+        caption += `🔢 <b>Kino kodi:</b> ${movie.code}\n👁 <b>Ko'rishlar:</b> ${views}`;
 
         let buttons = [];
 

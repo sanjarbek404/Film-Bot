@@ -42,9 +42,9 @@ export const setupAdminCommands = (bot) => {
                 [Markup.button.callback('🗑 VIP O\'chirish', 'admin_vip_remove_ui'), Markup.button.callback('📢 Majburiy Obuna', 'admin_subscription')],
                 [Markup.button.callback('🎬 Start Xabar/GIF', 'admin_start_gif'), Markup.button.callback('🎫 Promokod yaratish', 'admin_promo')],
                 [Markup.button.callback('📢 Avto-Post Sozlamalari', 'admin_autopost'), Markup.button.callback('👤 Profil user', 'admin_user_profile')],
-                [Markup.button.callback('👤 Profil user', 'admin_user_profile'), Markup.button.callback('📩 Shaxsiy Xat', 'admin_direct_message')],
-                [Markup.button.callback('👮‍♂️ Adminlar', 'admin_admins')],
-                [Markup.button.callback('💾 Bazani Zaxiralash', 'admin_backup'), Markup.button.callback('📈 Katta Statistika', 'admin_stats_advanced')]
+                [Markup.button.callback('📩 Shaxsiy Xat', 'admin_direct_message'), Markup.button.callback('👮‍♂️ Adminlar', 'admin_admins')],
+                [Markup.button.callback('📚 Ommaviy Tahrirlash (Serial)', 'admin_bulk_edit'), Markup.button.callback('💾 Bazani Zaxiralash', 'admin_backup')],
+                [Markup.button.callback('📈 Katta Statistika', 'admin_stats_advanced')]
             ];
 
             if (isAdmin(ctx.from.id)) {
@@ -97,6 +97,14 @@ export const setupAdminCommands = (bot) => {
             if (!await adminCheck(ctx)) return ctx.answerCbQuery('❌');
             await ctx.answerCbQuery();
             return ctx.scene.enter('START_GIF_SCENE');
+        } catch (e) { }
+    });
+
+    bot.action('admin_bulk_edit', async (ctx) => {
+        try {
+            if (!await adminCheck(ctx)) return ctx.answerCbQuery('❌');
+            await ctx.answerCbQuery();
+            return ctx.scene.enter('BULK_EDIT_MOVIE_SCENE');
         } catch (e) { }
     });
 

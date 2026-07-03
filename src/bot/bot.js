@@ -20,6 +20,7 @@ import directMessageScene from '../scenes/directMessageScene.js';
 import startGifScene from '../scenes/startGifScene.js';
 import addFavCodeScene from '../scenes/addFavCodeScene.js';
 import paymentReceiptScene from '../scenes/paymentReceiptScene.js';
+import bulkEditMovieScene from '../scenes/bulkEditMovieScene.js';
 import { setupAdminCommands } from '../commands/admin.js';
 import { setupStartCommand } from '../commands/start.js';
 import { setupUserCommands } from '../commands/user.js';
@@ -46,7 +47,8 @@ const stage = new Scenes.Stage([
     directMessageScene,
     startGifScene,
     addFavCodeScene,
-    paymentReceiptScene
+    paymentReceiptScene,
+    bulkEditMovieScene
 ]);
 
 const bot = new Telegraf(process.env.BOT_TOKEN);

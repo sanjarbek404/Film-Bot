@@ -186,11 +186,9 @@ export const setupUserCommands = (bot) => {
             }
             
             const buttons = [
-                [Markup.button.callback('❤️ Sevimlilar', 'cb_fav'), Markup.button.callback('➕ Saqlash (Kod)', 'cb_add_fav_code')],
-                [Markup.button.callback('💡 AI Tavsiyalar', 'cb_ai_rec'), Markup.button.callback('🎰 Omadni sinash', 'cb_random_cabinet')],
-                [Markup.button.callback('📜 Tarixim', 'cb_history'), Markup.button.callback('📊 Statistika', 'cb_stats')],
-                [Markup.button.callback('💎 VIP Do\'kon', 'cb_shop'), Markup.button.callback(isVip ? '👑 VIP Aktiv' : '💎 VIP Olish', isVip ? 'cb_vip' : 'cb_shop')],
-                [Markup.button.callback('🏆 Reyting - Top 10', 'cb_leaderboard')]
+                [Markup.button.callback('❤️ Sevimli kinolarim', 'cb_fav')],
+                [Markup.button.callback('📜 Ko\'rishlar tarixim', 'cb_history')],
+                [Markup.button.callback(isVip ? '👑 VIP Aktiv (Holat)' : '💎 VIP Olish', isVip ? 'cb_vip' : 'cb_shop'), Markup.button.callback('🎲 Tasodifiy kino', 'cb_random_cabinet')]
             ];
 
             await ctx.reply(msg, {
@@ -207,32 +205,7 @@ export const setupUserCommands = (bot) => {
     // KABINET INLINE TUGMALARI
     // ═══════════════════════════════════════════════════════
 
-    bot.action('cb_add_fav_code', async (ctx) => {
-        await ctx.answerCbQuery().catch(() => {});
-        ctx.scene.enter('ADD_FAV_CODE_SCENE');
-    });
 
-    bot.action('cb_ai_rec', async (ctx) => {
-        try {
-            await ctx.answerCbQuery('💡 AI tahlil qilmoqda...').catch(() => {});
-            const user = ctx.session?.user;
-            if (!user) return;
-            
-            const reqs = await getSmartRecommendations(user._id, 5);
-            if (!reqs || reqs.length === 0) {
-                return ctx.reply('📭 Hozircha tavsiyalar yo\'q. Ko\'proq kino ko\'ring!');
-            }
-
-            let msg = '💡 <b>AI Tavsiyalar (Sizga moslangan)</b>\n\n';
-            reqs.forEach((m, i) => {
-                msg += `${i + 1}. 🎬 ${m.title} — <code>${m.code}</code>\n`;
-            });
-            msg += '\n<i>Kodni yuboring va darhol tomosha qiling!</i>';
-            await ctx.replyWithHTML(msg);
-        } catch (e) {
-            logger.error('cb_ai_rec error:', e);
-        }
-    });
 
     bot.action('cb_random_cabinet', async (ctx) => {
         try {
@@ -330,52 +303,7 @@ export const setupUserCommands = (bot) => {
         }
     });
 
-    bot.action('cb_leaderboard', async (ctx) => {
-        try {
-            await ctx.answerCbQuery('Reyting...').catch(() => {});
-            const topUsers = await User.find({ isBanned: false }).sort({ moviesWatched: -1 }).limit(10).lean();
-            
-            let msg = `🏆 <b>Top 10 Faol Foydalanuvchilar</b>\n\n`;
-            topUsers.forEach((u, i) => {
-                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎗';
-                const name = (u.firstName || 'Foydalanuvchi').replace(/</g, '').replace(/>/g, '');
-                msg += `${medal} <b>${name}</b> — 🎬 ${u.moviesWatched || 0} ta kino\n`;
-            });
-            
-            await ctx.reply(msg, {
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Yopish', 'cb_close_msg')]])
-            });
-        } catch (e) {
-            logger.error('cb_leaderboard err:', e);
-        }
-    });
 
-    bot.action('cb_close_msg', async (ctx) => {
-        await ctx.deleteMessage().catch(() => {});
-    });
-
-    bot.action('cb_stats', async (ctx) => {
-        try {
-            await ctx.answerCbQuery().catch(() => {});
-            const user = ctx.session?.user;
-            if (!user) return;
-            const isVip = ctx.isVip();
-            const favCount = await Favorite.countDocuments({ user: user._id }).catch(() => 0);
-
-            let msg = `📊 <b>Statistika</b>\n\n`;
-            msg += `👤 <b>Ism:</b> ${user.firstName}\n`;
-            msg += `❤️ <b>Sevimlilar:</b> ${favCount} ta\n`;
-            msg += `🎬 <b>Ko'rilgan:</b> ${user.moviesWatched || 0} ta\n`;
-            
-            if (!isVip) {
-                msg += `\n<i>💎 VIP obuna oling!</i>`;
-                await ctx.reply(msg, { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('💎 VIP Olish', 'vip_info')]]) });
-            } else {
-                await ctx.reply(msg, { parse_mode: 'HTML' });
-            }
-        } catch (e) {}
-    });
 
     bot.action('cb_fav', async (ctx) => {
         try {

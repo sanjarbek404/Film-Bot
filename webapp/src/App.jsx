@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Play, Hash, Info, X } from 'lucide-react';
+import { Search, Play, Hash, X, Home, Compass, ArrowLeft } from 'lucide-react';
 
 const WebApp = window.Telegram.WebApp;
 
@@ -10,6 +10,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
 
   useEffect(() => {
     WebApp.ready();
@@ -168,9 +169,15 @@ function App() {
 
       {/* Main Content */}
       {loading ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="w-12 h-12 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin"></div>
-        </div>
+        <main className="pb-24 pt-20 px-4 max-w-5xl mx-auto">
+          <div className="w-full h-[60vh] bg-zinc-900/50 animate-pulse rounded-[2rem] mb-8 border border-white/5"></div>
+          <div className="space-y-4">
+            <div className="w-48 h-6 bg-zinc-900/50 animate-pulse rounded-full ml-4"></div>
+            <div className="flex gap-4 overflow-hidden px-4">
+              {[1, 2, 3, 4].map(i => <div key={i} className="w-32 md:w-40 aspect-[2/3] bg-zinc-900/50 animate-pulse rounded-2xl flex-none border border-white/5"></div>)}
+            </div>
+          </div>
+        </main>
       ) : search || isSearchActive ? (
         /* Search Results Grid */
         <main className="pt-24 px-4 max-w-5xl mx-auto">
@@ -275,10 +282,26 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 w-full bg-black/80 backdrop-blur-xl border-t border-white/10 z-50 px-8 py-3 pb-safe flex justify-between items-center text-[10px] font-bold text-gray-400">
+        <button onClick={() => { setActiveTab('home'); setIsSearchActive(false); setSearch(''); }} className={`flex flex-col items-center gap-1 transition-colors ${!isSearchActive && !search ? 'text-red-500' : 'hover:text-gray-200'}`}>
+          <Home className="w-6 h-6" />
+          <span>ASOSIY</span>
+        </button>
+        <button onClick={() => { setActiveTab('search'); setIsSearchActive(true); }} className={`flex flex-col items-center gap-1 transition-colors ${isSearchActive || search ? 'text-red-500' : 'hover:text-gray-200'}`}>
+          <Compass className="w-6 h-6" />
+          <span>QIDIRUV</span>
+        </button>
+        <button onClick={() => WebApp.close()} className="flex flex-col items-center gap-1 hover:text-gray-200 transition-colors">
+          <ArrowLeft className="w-6 h-6" />
+          <span>CHIQISH</span>
+        </button>
+      </div>
+
       {/* Hide scrollbar globally for this app */}
       <style dangerouslySetInnerHTML={{__html: `
         ::-webkit-scrollbar { display: none; }
+        body { padding-bottom: 80px; } /* Add padding for bottom nav */
       `}} />
     </div>
   );

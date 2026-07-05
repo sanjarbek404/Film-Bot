@@ -153,7 +153,7 @@ function App() {
           {/* Favorite Button */}
           <button 
             onClick={(e) => toggleFavorite(e, movie)}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 transition-transform active:scale-90 z-20"
+            className="absolute top-2 left-2 p-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 transition-transform active:scale-90 z-20"
           >
             <Heart className={`w-4 h-4 ${isFav ? 'fill-red-500 text-red-500' : 'text-white'}`} />
           </button>

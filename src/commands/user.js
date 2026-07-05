@@ -42,6 +42,9 @@ export const sendMovie = async (ctx, movie, dbUser) => {
         caption += `🔢 <b>Kino kodi:</b> ${movie.code}\n👁 <b>Ko'rishlar:</b> ${views}`;
 
         let buttons = [];
+        if (movie._id) {
+            buttons.push([Markup.button.callback('❤️ Saqlash', `fav_${movie._id}`)]);
+        }
 
         // 💎 VIP HIMOYA: Faqat VIP foydalanuvchilar yuklab olishi/uzatishi mumkin
         if (!isVip) {
@@ -307,7 +310,6 @@ export const setupUserCommands = (bot) => {
 
     bot.action('cb_fav', async (ctx) => {
         try {
-            if (!ctx.isVip()) return ctx.answerCbQuery(ctx.t('vip_restricted_fav'), { show_alert: true });
             
             await ctx.answerCbQuery().catch(() => {});
             const user = ctx.session?.user;
@@ -470,7 +472,6 @@ export const setupUserCommands = (bot) => {
     // ═══ SEVIMLILAR ═══
     bot.action(/fav_(.+)/, async (ctx) => {
         try {
-            if (!ctx.isVip()) return ctx.answerCbQuery(ctx.t('vip_restricted_fav'), { show_alert: true });
 
             const movieId = ctx.match[1];
             const user = ctx.session?.user;

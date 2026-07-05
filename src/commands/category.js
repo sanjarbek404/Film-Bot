@@ -108,19 +108,23 @@ export const setupInlineSearch = (bot) => {
                 }).limit(20);
             }
 
-            const results = movies.map((movie) => ({
-                type: 'article',
-                id: String(movie._id),
-                title: movie.title || 'Nomi yo\'q',
-                description: `📥 Kod: ${movie.code || 'N/A'} | 👁 ${movie.views || 0} marta ko'rilgan`,
-                input_message_content: {
-                    message_text: `🎬 <b>${movie.title || 'Film'}</b>\n\n📥 Kino kodi: <code>${movie.code}</code>\n\n<i>Kinoni to'liq ko'rish uchun pastdagi tugmani bosing!</i>`,
-                    parse_mode: 'HTML'
-                },
-                reply_markup: Markup.inlineKeyboard([
-                    [Markup.button.url('🎬 Kinoni botda ko\'rish', `https://t.me/${ctx.botInfo.username}?start=${movie.code}`)]
-                ]).reply_markup
-            }));
+            const results = movies.map((movie) => {
+                const isUrl = movie.poster && movie.poster.startsWith('http');
+                return {
+                    type: 'article',
+                    id: String(movie._id),
+                    title: movie.title || `Kino #${movie.code}`,
+                    description: `📥 Kod: ${movie.code} | 👁 ${movie.views || 0} ta | 🎭 ${movie.genre || 'Kino'} ${movie.year ? `(${movie.year})` : ''}`,
+                    ...(isUrl ? { thumbnail_url: movie.poster } : {}),
+                    input_message_content: {
+                        message_text: `🎬 <b>${movie.title && !movie.title.startsWith('Kino #') ? movie.title : `Kino #${movie.code}`}</b>\n\n📥 Kino kodi: <code>${movie.code}</code>\n🎭 Janr: ${movie.genre || 'Noma\'lum'}\n\n<i>Kinoni to'liq ko'rish uchun pastdagi tugmani bosing!</i>`,
+                        parse_mode: 'HTML'
+                    },
+                    reply_markup: Markup.inlineKeyboard([
+                        [Markup.button.url('🎬 Kinoni botda ko\'rish', `https://t.me/${ctx.botInfo.username}?start=${movie.code}`)]
+                    ]).reply_markup
+                };
+            });
 
             await ctx.answerInlineQuery(results, { cache_time: 10 });
         } catch (e) {

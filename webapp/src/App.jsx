@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Play, Hash, X, Home, Compass, ArrowLeft } from 'lucide-react';
+import { Search, Play, Hash, X, Home, Compass, ArrowLeft, Heart } from 'lucide-react';
 
 const WebApp = window.Telegram.WebApp;
 
@@ -12,6 +12,36 @@ function App() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState('Barchasi');
+  
+  // Favs and Infinite Scroll
+  const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem('favs') || '[]'));
+  const [visibleCount, setVisibleCount] = useState(15);
+  const scrollObserver = useRef();
+
+  useEffect(() => {
+    localStorage.setItem('favs', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const toggleFavorite = (e, movie) => {
+    e.stopPropagation();
+    if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred('light');
+    setFavorites(prev => {
+      const isFav = prev.some(f => f.code === movie.code);
+      if (isFav) return prev.filter(f => f.code !== movie.code);
+      return [...prev, movie];
+    });
+  };
+
+  const loadMoreRef = useCallback(node => {
+    if (loading) return;
+    if (scrollObserver.current) scrollObserver.current.disconnect();
+    scrollObserver.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 15);
+      }
+    });
+    if (node) scrollObserver.current.observe(node);
+  }, [loading]);
 
   useEffect(() => {
     WebApp.ready();
@@ -104,6 +134,7 @@ function App() {
     const episode = getEpisodeNumber(movie.title);
     
     const displayTitle = movie.title && !movie.title.startsWith('Kino #') ? movie.title : `Kino #${movie.code}`;
+    const isFav = favorites.some(f => f.code === movie.code);
     
     return (
       <motion.div 
@@ -118,6 +149,14 @@ function App() {
         <div className="relative overflow-hidden rounded-2xl shadow-xl border border-white/10 bg-zinc-900 aspect-[2/3] w-full">
           <img src={imgUrl} alt="Movie" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
+          
+          {/* Favorite Button */}
+          <button 
+            onClick={(e) => toggleFavorite(e, movie)}
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 transition-transform active:scale-90 z-20"
+          >
+            <Heart className={`w-4 h-4 ${isFav ? 'fill-red-500 text-red-500' : 'text-white'}`} />
+          </button>
           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center backdrop-blur-[2px]">
             <div className="w-12 h-12 rounded-full bg-red-600/90 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.6)] transform scale-75 group-hover:scale-100 transition-transform duration-300">
               <Play className="w-5 h-5 text-white ml-1" />
@@ -198,13 +237,34 @@ function App() {
             </div>
           </div>
         </main>
+      ) : activeTab === 'favorites' ? (
+        <main className="pt-24 px-4 max-w-5xl mx-auto min-h-screen">
+          <h2 className="text-xl font-bold mb-4 text-white flex items-center gap-2">
+            <Heart className="w-5 h-5 text-red-500 fill-red-500" /> Sevimli Kinolarim
+          </h2>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pb-10">
+            {favorites.length > 0 ? (
+              favorites.map((movie, idx) => renderMovieCard(movie, idx))
+            ) : (
+              <div className="col-span-full py-20 text-center text-gray-500">
+                <Heart className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>Hali hech narsa saqlamadingiz</p>
+              </div>
+            )}
+          </div>
+        </main>
       ) : search || isSearchActive ? (
         /* Search Results Grid */
         <main className="pt-24 px-4 max-w-5xl mx-auto">
           <h2 className="text-xl font-bold mb-4 text-gray-300">Qidiruv natijalari</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {filteredMovies.length > 0 ? (
-              filteredMovies.map((movie, idx) => renderMovieCard(movie, idx))
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pb-10">
+            {filteredMovies.slice(0, visibleCount).length > 0 ? (
+              filteredMovies.slice(0, visibleCount).map((movie, idx) => {
+                if (idx === filteredMovies.slice(0, visibleCount).length - 1) {
+                  return <div ref={loadMoreRef} key={movie.code}>{renderMovieCard(movie, idx)}</div>
+                }
+                return renderMovieCard(movie, idx);
+              })
             ) : (
               <div className="col-span-full py-20 text-center text-gray-500">
                 <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -300,11 +360,16 @@ function App() {
                 </section>
               </>
             ) : (
-              <section className="animate-in fade-in duration-300">
+              <section className="animate-in fade-in duration-300 min-h-screen">
                 <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-4">{selectedCategory} kinolar</h2>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 px-4 pb-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 px-4 pb-10">
                   {categoryMovies.length > 0 ? (
-                    categoryMovies.map((movie, idx) => renderMovieCard(movie, idx))
+                    categoryMovies.slice(0, visibleCount).map((movie, idx) => {
+                      if (idx === categoryMovies.slice(0, visibleCount).length - 1) {
+                        return <div ref={loadMoreRef} key={movie.code}>{renderMovieCard(movie, idx)}</div>
+                      }
+                      return renderMovieCard(movie, idx);
+                    })
                   ) : (
                     <div className="col-span-full text-center text-gray-500 py-10 text-sm">
                       Bu janrda hozircha kinolar yo'q
@@ -334,17 +399,17 @@ function App() {
       </AnimatePresence>
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 w-full bg-black/80 backdrop-blur-xl border-t border-white/10 z-50 px-8 py-3 pb-safe flex justify-between items-center text-[10px] font-bold text-gray-400">
-        <button onClick={() => { setActiveTab('home'); setIsSearchActive(false); setSearch(''); }} className={`flex flex-col items-center gap-1 transition-colors ${!isSearchActive && !search ? 'text-red-500' : 'hover:text-gray-200'}`}>
+        <button onClick={() => { setActiveTab('home'); setIsSearchActive(false); setSearch(''); }} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' && !isSearchActive && !search ? 'text-red-500' : 'hover:text-gray-200'}`}>
           <Home className="w-6 h-6" />
           <span>ASOSIY</span>
         </button>
-        <button onClick={() => { setActiveTab('search'); setIsSearchActive(true); }} className={`flex flex-col items-center gap-1 transition-colors ${isSearchActive || search ? 'text-red-500' : 'hover:text-gray-200'}`}>
+        <button onClick={() => { setActiveTab('search'); setIsSearchActive(true); }} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'search' || isSearchActive || search ? 'text-red-500' : 'hover:text-gray-200'}`}>
           <Compass className="w-6 h-6" />
           <span>QIDIRUV</span>
         </button>
-        <button onClick={() => WebApp.close()} className="flex flex-col items-center gap-1 hover:text-gray-200 transition-colors">
-          <ArrowLeft className="w-6 h-6" />
-          <span>CHIQISH</span>
+        <button onClick={() => { setActiveTab('favorites'); setIsSearchActive(false); setSearch(''); }} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'favorites' ? 'text-red-500' : 'hover:text-gray-200'}`}>
+          <Heart className="w-6 h-6" />
+          <span>SEVIMLILAR</span>
         </button>
       </div>
 

@@ -11,6 +11,7 @@ function App() {
   const [toast, setToast] = useState('');
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
+  const [selectedCategory, setSelectedCategory] = useState('Barchasi');
 
   useEffect(() => {
     WebApp.ready();
@@ -65,6 +66,25 @@ function App() {
   const newMovies = useMemo(() => [...movies].reverse().slice(0, 15), [movies]);
   const topMovies = useMemo(() => [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 15), [movies]);
   const featuredMovie = useMemo(() => topMovies.length > 0 ? topMovies[0] : null, [topMovies]);
+
+  // Dynamic Genres
+  const genres = useMemo(() => {
+    const genreSet = new Set();
+    movies.forEach(m => {
+      if (m.genre && m.genre.trim() !== '' && m.genre !== 'Noma\'lum') {
+        const parts = m.genre.split(',').map(g => g.trim());
+        parts.forEach(p => {
+          if (p) genreSet.add(p);
+        });
+      }
+    });
+    return ['Barchasi', ...Array.from(genreSet)].slice(0, 15);
+  }, [movies]);
+
+  const categoryMovies = useMemo(() => {
+    if (selectedCategory === 'Barchasi') return [];
+    return movies.filter(m => m.genre && m.genre.includes(selectedCategory)).slice(0, 50);
+  }, [movies, selectedCategory]);
 
   const featuredTitle = useMemo(() => {
     if (!featuredMovie) return '';
@@ -247,22 +267,52 @@ function App() {
             </div>
           )}
 
-          <div className="max-w-5xl mx-auto mt-6 space-y-8">
-            {/* Yangi Kinolar Row */}
-            <section>
-              <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-3">Yangi Qo'shilganlar</h2>
-              <div className="flex overflow-x-auto gap-3 px-4 pb-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {newMovies.map((movie, idx) => renderMovieCard(movie, idx))}
-              </div>
-            </section>
+          <div className="max-w-5xl mx-auto mt-4 space-y-6">
+            {/* Category Filter Chips */}
+            <div className="flex overflow-x-auto gap-2 px-4 pb-2 scrollbar-hide snap-x" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {genres.map(g => (
+                <button
+                  key={g}
+                  onClick={() => setSelectedCategory(g)}
+                  className={`snap-start whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] md:text-sm font-bold border transition-colors ${selectedCategory === g ? 'bg-red-600 text-white border-red-500 shadow-lg' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
 
-            {/* Top Kinolar Row */}
-            <section>
-              <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-3">Top Kinolar (Trendda)</h2>
-              <div className="flex overflow-x-auto gap-3 px-4 pb-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {topMovies.map((movie, idx) => renderMovieCard(movie, idx))}
-              </div>
-            </section>
+            {selectedCategory === 'Barchasi' ? (
+              <>
+                {/* Yangi Kinolar Row */}
+                <section>
+                  <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-3">Yangi Qo'shilganlar</h2>
+                  <div className="flex overflow-x-auto gap-3 px-4 pb-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {newMovies.map((movie, idx) => renderMovieCard(movie, idx))}
+                  </div>
+                </section>
+
+                {/* Top Kinolar Row */}
+                <section>
+                  <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-3">Top Kinolar (Trendda)</h2>
+                  <div className="flex overflow-x-auto gap-3 px-4 pb-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {topMovies.map((movie, idx) => renderMovieCard(movie, idx))}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <section className="animate-in fade-in duration-300">
+                <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-4">{selectedCategory} kinolar</h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 px-4 pb-4">
+                  {categoryMovies.length > 0 ? (
+                    categoryMovies.map((movie, idx) => renderMovieCard(movie, idx))
+                  ) : (
+                    <div className="col-span-full text-center text-gray-500 py-10 text-sm">
+                      Bu janrda hozircha kinolar yo'q
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </main>
       )}

@@ -14,7 +14,7 @@ export const sendMainMenu = async (ctx) => {
         let menu = [
             [Markup.button.webApp('🌐 Kinolar Katalogi', webAppUrl)],
             [ctx.t('menu_search'), ctx.t('menu_cabinet')],
-            [ctx.t('menu_random')]
+            [ctx.t('menu_random'), ctx.t('menu_settings') || '⚙️ Sozlamalar']
         ];
 
         let welcomeMsg = ctx.t('welcome', { name: ctx.from.first_name });

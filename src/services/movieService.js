@@ -85,6 +85,10 @@ export const getNewMovies = async (limit = 10) => {
     }
 };
 
+export const getAllMovies = async () => {
+    return getNewMovies(20);
+};
+
 export const getAllMoviesLite = async () => {
     try {
         const cacheKey = 'all_movies_lite';

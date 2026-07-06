@@ -242,18 +242,8 @@ function App() {
           </div>
         </div>
         
-        {/* Netflix Top 10 Number */}
-        {isTop10 && (
-          <span 
-            className="absolute -left-6 -bottom-8 text-[120px] font-black italic z-20 text-black/80 tracking-tighter drop-shadow-2xl" 
-            style={{ WebkitTextStroke: '3px rgba(255,255,255,0.9)' }}
-          >
-            {rank}
-          </span>
-        )}
-
         {/* Title below poster */}
-        <div className={`px-1 pt-0.5 ${isTop10 ? 'pl-6' : ''}`}>
+        <div className="px-1 pt-0.5">
           <h3 className="text-gray-100 text-sm font-medium truncate w-full group-hover:text-red-400 transition-colors" title={displayTitle}>
             {displayTitle}
           </h3>

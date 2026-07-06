@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './src/config/db.js';
 import bot from './src/bot/bot.js';
-import { getTopMovies } from './src/services/movieService.js';
+import { getAllMoviesLite } from './src/services/movieService.js';
 import User from './src/models/User.js';
 import Favorite from './src/models/Favorite.js';
 
@@ -93,7 +93,7 @@ const startBot = async () => {
 
         app.get('/api/movies', async (req, res) => {
             try {
-                const movies = await getTopMovies(100);
+                const movies = await getAllMoviesLite();
                 res.json(movies);
             } catch (e) {
                 res.status(500).json({ error: 'Server error' });

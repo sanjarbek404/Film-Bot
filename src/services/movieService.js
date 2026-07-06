@@ -6,6 +6,7 @@ export const createMovie = async (movieData) => {
     try {
         myCache.del('new_movies');
         myCache.del('movie_count');
+        myCache.del('all_movies_lite');
         myCache.keys().filter(k => k.startsWith('top_movies')).forEach(k => myCache.del(k));
         return await Movie.create(movieData);
     } catch (error) {
@@ -61,6 +62,7 @@ export const deleteMovie = async (code) => {
         myCache.del(`movie_${code}`);
         myCache.del('new_movies');
         myCache.del('movie_count');
+        myCache.del('all_movies_lite');
         return await Movie.findOneAndDelete({ code });
     } catch (error) {
         logger.error('Delete movie error:', error);
@@ -83,8 +85,19 @@ export const getNewMovies = async (limit = 10) => {
     }
 };
 
-export const getAllMovies = async () => {
-    return getNewMovies(20);
+export const getAllMoviesLite = async () => {
+    try {
+        const cacheKey = 'all_movies_lite';
+        let cached = myCache.get(cacheKey);
+        if (cached) return cached;
+
+        const movies = await Movie.find({}, 'code title poster genre year views').sort({ createdAt: -1 }).lean();
+        if (movies) myCache.set(cacheKey, movies, 300);
+        return movies || [];
+    } catch (error) {
+        logger.error('Get all movies lite error:', error);
+        return [];
+    }
 };
 
 export const countMovies = async () => {
@@ -135,6 +148,7 @@ export const getMoviesByGenre = async (genre) => {
 export const updateMovie = async (code, data) => {
     try {
         myCache.del(`movie_${code}`);
+        myCache.del('all_movies_lite');
         return await Movie.findOneAndUpdate({ code }, data, { new: true });
     } catch (error) {
         logger.error('Update movie error:', error);

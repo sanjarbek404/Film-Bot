@@ -27,14 +27,6 @@ export const sendMainMenu = async (ctx) => {
             parse_mode: 'HTML',
             ...Markup.keyboard(menu).resize()
         });
-
-        // Zamonaviy Inline Web App tugmasi
-        await ctx.reply(`🎬 <b>Yangi avlod katalogi!</b>\n\nPastdagi tugmani bosib, eng so'nggi kinolarni qulay formatda tomosha qiling:`, {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-                [Markup.button.webApp('🔥 KINOLAR KATALOGI', webAppUrl)]
-            ])
-        });
     } catch (error) {
         logger.error('Send Main Menu Error:', error);
         ctx.reply(ctx.t?.('error_general') || '❌ Xatolik yuz berdi.').catch(() => {});

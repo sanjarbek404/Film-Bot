@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Play, Hash, X, Home, Compass, ArrowLeft, Heart } from 'lucide-react';
+import { Search, Play, Hash, X, Home, Compass, ArrowLeft, Heart, ArrowUp } from 'lucide-react';
 
 const WebApp = window.Telegram.WebApp;
 
@@ -18,7 +18,24 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(15);
   const scrollObserver = useRef();
   
+  // New UI states
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
   const userId = WebApp.initDataUnsafe?.user?.id;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred('light');
+  };
 
   useEffect(() => {
     localStorage.setItem('favs', JSON.stringify(favorites));
@@ -119,7 +136,16 @@ function App() {
   // Compute categories
   const newMovies = useMemo(() => [...movies].reverse().slice(0, 15), [movies]);
   const topMovies = useMemo(() => [...movies].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 15), [movies]);
-  const featuredMovie = useMemo(() => topMovies.length > 0 ? topMovies[0] : null, [topMovies]);
+  
+  useEffect(() => {
+    if (topMovies.length === 0) return;
+    const interval = setInterval(() => {
+      setHeroIndex(prev => (prev + 1) % Math.min(topMovies.length, 5));
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [topMovies]);
+  
+  const featuredMovie = useMemo(() => topMovies.length > 0 ? topMovies[heroIndex] : null, [topMovies, heroIndex]);
 
   // Dynamic Genres
   const genres = useMemo(() => {
@@ -134,6 +160,22 @@ function App() {
     });
     return ['Barchasi', ...Array.from(genreSet)].slice(0, 15);
   }, [movies]);
+
+  const getGenreEmoji = (genre) => {
+    const g = genre.toLowerCase();
+    if (g.includes('jangari') || g.includes('boevik')) return '💥';
+    if (g.includes('komediya')) return '😂';
+    if (g.includes('fantastika')) return '🛸';
+    if (g.includes('qorqinchli') || g.includes('dahshat')) return '👻';
+    if (g.includes('drama')) return '🎭';
+    if (g.includes('melodrama')) return '💔';
+    if (g.includes('multfilm') || g.includes('animatsiya')) return '🦁';
+    if (g.includes('sarguzasht')) return '🗺️';
+    if (g.includes('kriminal')) return '🕵️';
+    if (g.includes('triller')) return '🔪';
+    if (g.includes('tarixiy')) return '📜';
+    return '🍿';
+  };
 
   const categoryMovies = useMemo(() => {
     if (selectedCategory === 'Barchasi') return [];
@@ -300,19 +342,28 @@ function App() {
       ) : (
         /* Netflix Home Layout */
         <main className="pb-10">
-          {/* Hero Banner */}
+          {/* Hero Banner Carousel */}
           {featuredMovie && (
-            <div className="relative w-full h-[60vh] md:h-[70vh] flex items-end">
-              <div className="absolute inset-0">
-                <img 
-                  src={featuredMovie.poster && featuredMovie.poster.startsWith('http') ? featuredMovie.poster : `/api/image/${featuredMovie.poster}`} 
-                  alt="Featured" 
-                  className="w-full h-full object-cover object-center"
-                />
-                {/* Netflix Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent"></div>
-              </div>
+            <div className="relative w-full h-[60vh] md:h-[70vh] flex items-end overflow-hidden">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={featuredMovie._id || featuredMovie.code}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="absolute inset-0"
+                >
+                  <img 
+                    src={featuredMovie.poster && featuredMovie.poster.startsWith('http') ? featuredMovie.poster : `/api/image/${featuredMovie.poster}`} 
+                    alt="Featured" 
+                    className="w-full h-full object-cover object-center"
+                  />
+                  {/* Netflix Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-transparent"></div>
+                </motion.div>
+              </AnimatePresence>
               
               <div className="relative z-10 p-6 md:p-12 w-full max-w-5xl mx-auto flex flex-col justify-end h-full">
                 <motion.div 
@@ -324,14 +375,18 @@ function App() {
                   <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded tracking-wider shadow-[0_0_10px_rgba(220,38,38,0.5)]">TOP TAVSIYA</span>
                 </motion.div>
                 
-                <motion.h1 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-4xl md:text-6xl font-black text-white mb-6 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] leading-tight"
-                >
-                  {featuredTitle}
-                </motion.h1>
+                <AnimatePresence mode="wait">
+                  <motion.h1 
+                    key={featuredMovie._id || featuredMovie.code}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="text-4xl md:text-6xl font-black text-white mb-6 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] leading-tight"
+                  >
+                    {featuredTitle}
+                  </motion.h1>
+                </AnimatePresence>
                 
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
@@ -358,9 +413,9 @@ function App() {
                 <button
                   key={g}
                   onClick={() => setSelectedCategory(g)}
-                  className={`snap-start whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] md:text-sm font-bold border transition-colors ${selectedCategory === g ? 'bg-red-600 text-white border-red-500 shadow-lg' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'}`}
+                  className={`snap-start whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] md:text-sm font-bold border transition-all ${selectedCategory === g ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)] scale-105' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'}`}
                 >
-                  {g}
+                  {g === 'Barchasi' ? '🎯 Barchasi' : `${getGenreEmoji(g)} ${g}`}
                 </button>
               ))}
             </div>
@@ -405,6 +460,21 @@ function App() {
           </div>
         </main>
       )}
+
+      {/* Scroll to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            onClick={scrollToTop}
+            className="fixed bottom-24 right-4 z-50 p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full shadow-2xl hover:bg-white/20 active:scale-95 transition-all"
+          >
+            <ArrowUp className="w-5 h-5 text-white" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toast && (

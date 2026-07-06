@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import connectDB from './src/config/db.js';
 import bot from './src/bot/bot.js';
 import { getTopMovies } from './src/services/movieService.js';
+import User from './src/models/User.js';
+import Favorite from './src/models/Favorite.js';
 
 dotenv.config();
 
@@ -40,6 +42,8 @@ const startBot = async () => {
         app.get('/health', (req, res) => {
             res.json({ status: 'ok', timestamp: new Date() });
         });
+
+        app.use(express.json());
 
         app.use((req, res, next) => {
             res.header('Access-Control-Allow-Origin', '*');
@@ -92,6 +96,41 @@ const startBot = async () => {
                 const movies = await getTopMovies(100);
                 res.json(movies);
             } catch (e) {
+                res.status(500).json({ error: 'Server error' });
+            }
+        });
+
+        // ═══ FAVORITES SYNC API ═══
+        app.get('/api/favorites/:telegramId', async (req, res) => {
+            try {
+                const user = await User.findOne({ telegramId: req.params.telegramId });
+                if (!user) return res.json([]);
+                const favs = await Favorite.find({ user: user._id }).populate('movie');
+                res.json(favs.map(f => f.movie).filter(m => m));
+            } catch (e) {
+                console.error(e);
+                res.status(500).json({ error: 'Server error' });
+            }
+        });
+
+        app.post('/api/favorites/toggle', async (req, res) => {
+            try {
+                const { userId, movieId } = req.body;
+                if (!userId || !movieId) return res.status(400).json({ error: 'Missing data' });
+                
+                const user = await User.findOne({ telegramId: userId });
+                if (!user) return res.status(404).json({ error: 'User not found' });
+                
+                const exists = await Favorite.findOne({ user: user._id, movie: movieId });
+                if (exists) {
+                    await Favorite.findOneAndDelete({ user: user._id, movie: movieId });
+                    res.json({ status: 'removed' });
+                } else {
+                    await Favorite.create({ user: user._id, movie: movieId });
+                    res.json({ status: 'added' });
+                }
+            } catch (e) {
+                console.error(e);
                 res.status(500).json({ error: 'Server error' });
             }
         });

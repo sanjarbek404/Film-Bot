@@ -17,6 +17,8 @@ function App() {
   const [favorites, setFavorites] = useState(() => JSON.parse(localStorage.getItem('favs') || '[]'));
   const [visibleCount, setVisibleCount] = useState(15);
   const scrollObserver = useRef();
+  
+  const userId = WebApp.initDataUnsafe?.user?.id;
 
   useEffect(() => {
     localStorage.setItem('favs', JSON.stringify(favorites));
@@ -25,11 +27,22 @@ function App() {
   const toggleFavorite = (e, movie) => {
     e.stopPropagation();
     if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred('light');
+    
+    // Optimistic Update
     setFavorites(prev => {
       const isFav = prev.some(f => f.code === movie.code);
       if (isFav) return prev.filter(f => f.code !== movie.code);
       return [...prev, movie];
     });
+
+    // API Sync
+    if (userId && movie._id) {
+      fetch('/api/favorites/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, movieId: movie._id })
+      }).catch(err => console.error('Fav sync err:', err));
+    }
   };
 
   const loadMoreRef = useCallback(node => {
@@ -65,7 +78,18 @@ function App() {
         console.error(e);
         setLoading(false);
       });
-  }, []);
+
+    if (userId) {
+      fetch(`/api/favorites/${userId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            setFavorites(data);
+          }
+        })
+        .catch(e => console.error('Load favs error:', e));
+    }
+  }, [userId]);
 
   const handleSelect = (movie) => {
     if (WebApp.HapticFeedback) WebApp.HapticFeedback.impactOccurred('medium');

@@ -23,7 +23,7 @@ const addMovieScene = new Scenes.WizardScene(
             const nextCode = await generateMovieCode();
             ctx.wizard.state.autoCode = nextCode;
 
-            await ctx.reply(`🎬 <b>Kino qo'shish (Tezkor Rejim)</b>\n\nIltimos, kinoning <b>VIDEO</b> faylini yuboring.\n💡 <i>Maslahat: Video tagiga (caption) kinoning aniq nomini yozsangiz, bot uning rasmi va ma'lumotlarini o'zi topib beradi!</i>\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
+            await ctx.reply(`🎬 <b>Kino qo'shish (Tezkor Rejim)</b>\n\nIltimos, avval kinoning <b>VIDEO</b> faylini yuboring:\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
                 parse_mode: 'HTML',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
@@ -36,7 +36,7 @@ const addMovieScene = new Scenes.WizardScene(
             return ctx.scene.leave();
         }
     },
-    // Step 1: Receive Video, fetch details
+    // Step 1: Receive Video, Ask for Title
     async (ctx) => {
         try {
             if (ctx.message?.video) {
@@ -47,11 +47,41 @@ const addMovieScene = new Scenes.WizardScene(
                 return ctx.reply('⚠️ Iltimos, faqat video fayl yuboring.');
             }
 
-            const caption = ctx.message?.caption;
-            
-            if (caption) {
+            await ctx.reply('📝 <b>Ajoyib!</b> Endi kinoning <b>aniq nomini</b> yozib yuboring (Ma\'lumotlarni avtomatik topish uchun).\n\n<i>Yoki qidirishni xohlamasangiz, to\'g\'ridan-to\'g\'ri kinoning <b>POSTERINI</b> (rasmini) yuboring.</i>', {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
+                ])
+            });
+            return ctx.wizard.next();
+        } catch (e) {
+            logger.error('Add movie step 1 error:', e);
+            return ctx.scene.leave();
+        }
+    },
+    // Step 2: Receive Title (Fetch API) OR Receive Manual Poster
+    async (ctx) => {
+        try {
+            if (ctx.message?.photo) {
+                // User sent photo directly, bypassing title
+                ctx.wizard.state.aiDetails = null;
+                ctx.wizard.state.poster = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                
+                await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino barcha uchun ochiq (lekin saqlash faqat VIP uchun) bo\'lsinmi yoki umuman yopiq (qat\'iy himoya) bo\'lsinmi?', {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🔓 Standart himoya', 'restrict_false')],
+                        [Markup.button.callback('🔐 Qat\'iy himoya', 'restrict_true')],
+                        [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
+                    ])
+                });
+                return ctx.wizard.selectStep(4);
+            }
+
+            const title = ctx.message?.text;
+            if (title) {
                 const searchMsg = await ctx.reply('🔍 <i>Kino ma\'lumotlari qidirilmoqda...</i>', { parse_mode: 'HTML' });
-                const movieDetails = await searchMovie(caption);
+                const movieDetails = await searchMovie(title);
                 
                 if (movieDetails && movieDetails.poster) {
                     ctx.wizard.state.aiDetails = movieDetails;
@@ -67,26 +97,39 @@ const addMovieScene = new Scenes.WizardScene(
                             [Markup.button.callback('❌ Yo\'q, o\'zim kiritaman', 'ai_reject')]
                         ])
                     });
-                    return ctx.wizard.next();
+                    return ctx.wizard.next(); // Go to step 3 (Confirm AI)
                 } else {
                     await ctx.telegram.deleteMessage(ctx.chat.id, searchMsg.message_id).catch(()=>{});
                     await ctx.reply('ℹ️ Kino bazadan topilmadi. Iltimos, kinoning <b>POSTERINI</b> (rasmini) qo\'lda yuboring:');
                     ctx.wizard.state.aiDetails = null;
-                    return ctx.wizard.selectStep(3);
+                    return ctx.wizard.selectStep(3); // Go to step 3 (which will act as manual poster step if they upload photo)
                 }
-            } else {
-                await ctx.reply('🖼️ Iltimos, kinoning <b>POSTERINI</b> (rasmini) yuboring:');
-                ctx.wizard.state.aiDetails = null;
-                return ctx.wizard.selectStep(3); // Jump to manual poster step
             }
+
+            return ctx.reply('Iltimos, kino nomini yozing yoki rasm yuboring.');
         } catch (e) {
-            logger.error('Add movie step 1 error:', e);
+            logger.error('Add movie step 2 error:', e);
             return ctx.scene.leave();
         }
     },
-    // Step 2: Handle AI Confirmation
+    // Step 3: Handle AI Confirmation OR Receive Manual Poster
     async (ctx) => {
         try {
+            if (ctx.message?.photo) {
+                // If they are here, it means they skipped AI or rejected AI and sent a manual poster
+                ctx.wizard.state.poster = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                
+                await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino barcha uchun ochiq (lekin saqlash faqat VIP uchun) bo\'lsinmi yoki umuman yopiq (qat\'iy himoya) bo\'lsinmi?', {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🔓 Standart himoya', 'restrict_false')],
+                        [Markup.button.callback('🔐 Qat\'iy himoya', 'restrict_true')],
+                        [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
+                    ])
+                });
+                return ctx.wizard.selectStep(4);
+            }
+
             if (ctx.callbackQuery) {
                 const data = ctx.callbackQuery.data;
                 await ctx.answerCbQuery().catch(() => {});
@@ -111,35 +154,15 @@ const addMovieScene = new Scenes.WizardScene(
                     return ctx.wizard.selectStep(4);
                 } else if (data === 'ai_reject') {
                     await ctx.reply('🖼️ Iltimos, kinoning <b>POSTERINI</b> (rasmini) yuboring:');
-                    return ctx.wizard.selectStep(3);
+                    // Stay on Step 3, wait for photo
+                    return;
                 }
-            } else {
-                await ctx.reply('Iltimos, tugmalardan birini tanlang.');
             }
-        } catch (e) {
-            logger.error('Add movie step 2 error:', e);
-            return ctx.scene.leave();
-        }
-    },
-    // Step 3: Receive Manual Poster
-    async (ctx) => {
-        try {
-            if (!ctx.message?.photo) {
+            
+            // If they just typed text instead of sending photo
+            if (ctx.message?.text && !ctx.wizard.state.aiDetails) {
                 return ctx.reply('⚠️ Iltimos, rasm yuboring.');
             }
-
-            // Get highest resolution photo
-            ctx.wizard.state.poster = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-
-            await ctx.reply('🔒 <b>VIP Himoyasi:</b>\n\nBu kino barcha uchun ochiq (lekin saqlash faqat VIP uchun) bo\'lsinmi yoki umuman yopiq (qat\'iy himoya) bo\'lsinmi?', {
-                parse_mode: 'HTML',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🔓 Standart himoya', 'restrict_false')],
-                    [Markup.button.callback('🔐 Qat\'iy himoya', 'restrict_true')],
-                    [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]
-                ])
-            });
-            return ctx.wizard.next();
         } catch (e) {
             logger.error('Add movie step 3 error:', e);
             return ctx.scene.leave();
@@ -242,7 +265,7 @@ addMovieScene.action('add_another_movie', async (ctx) => {
         }
         ctx.wizard.state.autoCode = nextCode;
         
-        await ctx.reply(`🎬 <b>Kino qo'shish (Tezkor Rejim)</b>\n\nIltimos, kinoning <b>VIDEO</b> faylini yuboring.\n💡 <i>Maslahat: Video tagiga (caption) kinoning aniq nomini yozsangiz, bot uning rasmi va ma'lumotlarini o'zi topib beradi!</i>\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
+        await ctx.reply(`🎬 <b>Kino qo'shish (Tezkor Rejim)</b>\n\nIltimos, avval kinoning <b>VIDEO</b> faylini yuboring:\n\n<i>Kino kodi: <code>${nextCode}</code></i>`, {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('❌ Bekor qilish', 'cancel_add')]

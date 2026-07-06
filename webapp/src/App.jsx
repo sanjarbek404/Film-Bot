@@ -195,7 +195,7 @@ function App() {
     return match ? match[1] : null;
   };
 
-  const renderMovieCard = (movie, index) => {
+  const renderMovieCard = (movie, index, isTop10 = false, rank = 0) => {
     const imgUrl = movie.poster && movie.poster.startsWith('http') ? movie.poster : `/api/image/${movie.poster}`;
     const episode = getEpisodeNumber(movie.title);
     
@@ -209,7 +209,7 @@ function App() {
         transition={{ delay: index * 0.05 }}
         whileTap={{ scale: 0.95 }}
         key={movie._id || movie.code} 
-        className="flex-none w-32 md:w-40 flex flex-col relative group cursor-pointer snap-start gap-1.5"
+        className={`flex-none flex flex-col relative group cursor-pointer snap-start gap-1.5 ${isTop10 ? 'w-40 md:w-48 ml-4' : 'w-32 md:w-40'}`}
         onClick={() => handleSelect(movie)}
       >
         <div className="relative overflow-hidden rounded-2xl shadow-xl border border-white/10 bg-zinc-900 aspect-[2/3] w-full">
@@ -242,11 +242,26 @@ function App() {
           </div>
         </div>
         
+        {/* Netflix Top 10 Number */}
+        {isTop10 && (
+          <span 
+            className="absolute -left-6 -bottom-8 text-[120px] font-black italic z-20 text-black/80 tracking-tighter drop-shadow-2xl" 
+            style={{ WebkitTextStroke: '3px rgba(255,255,255,0.9)' }}
+          >
+            {rank}
+          </span>
+        )}
+
         {/* Title below poster */}
-        <div className="px-1 pt-0.5">
+        <div className={`px-1 pt-0.5 ${isTop10 ? 'pl-6' : ''}`}>
           <h3 className="text-gray-100 text-sm font-medium truncate w-full group-hover:text-red-400 transition-colors" title={displayTitle}>
             {displayTitle}
           </h3>
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium mt-0.5">
+            {movie.year && <span>{movie.year}</span>}
+            {movie.year && movie.genre && movie.genre !== 'Noma\'lum' && <span>•</span>}
+            {movie.genre && movie.genre !== 'Noma\'lum' && <span className="truncate">{movie.genre.split(',')[0]}</span>}
+          </div>
         </div>
       </motion.div>
     );
@@ -295,11 +310,22 @@ function App() {
       {/* Main Content */}
       {loading ? (
         <main className="pb-24 pt-20 px-4 max-w-5xl mx-auto">
-          <div className="w-full h-[60vh] bg-zinc-900/50 animate-pulse rounded-[2rem] mb-8 border border-white/5"></div>
-          <div className="space-y-4">
-            <div className="w-48 h-6 bg-zinc-900/50 animate-pulse rounded-full ml-4"></div>
+          {/* Skeleton Hero */}
+          <div className="w-full h-[60vh] bg-zinc-900 animate-pulse rounded-[2rem] mb-8 border border-white/5 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+          </div>
+          <div className="space-y-6">
+            <div className="w-48 h-6 bg-zinc-900 animate-pulse rounded-full ml-4"></div>
             <div className="flex gap-4 overflow-hidden px-4">
-              {[1, 2, 3, 4].map(i => <div key={i} className="w-32 md:w-40 aspect-[2/3] bg-zinc-900/50 animate-pulse rounded-2xl flex-none border border-white/5"></div>)}
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex-none flex flex-col gap-2 w-32 md:w-40">
+                  <div className="aspect-[2/3] w-full bg-zinc-900 animate-pulse rounded-2xl border border-white/5 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+                  </div>
+                  <div className="w-3/4 h-3 bg-zinc-900 animate-pulse rounded"></div>
+                  <div className="w-1/2 h-2 bg-zinc-900 animate-pulse rounded"></div>
+                </div>
+              ))}
             </div>
           </div>
         </main>
@@ -321,23 +347,45 @@ function App() {
         </main>
       ) : search || isSearchActive ? (
         /* Search Results Grid */
-        <main className="pt-24 px-4 max-w-5xl mx-auto">
-          <h2 className="text-xl font-bold mb-4 text-gray-300">Qidiruv natijalari</h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pb-10">
-            {filteredMovies.slice(0, visibleCount).length > 0 ? (
-              filteredMovies.slice(0, visibleCount).map((movie, idx) => {
-                if (idx === filteredMovies.slice(0, visibleCount).length - 1) {
-                  return <div ref={loadMoreRef} key={movie.code}>{renderMovieCard(movie, idx)}</div>
-                }
-                return renderMovieCard(movie, idx);
-              })
-            ) : (
-              <div className="col-span-full py-20 text-center text-gray-500">
-                <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>Hech narsa topilmadi</p>
+        <main className="pt-24 px-4 max-w-5xl mx-auto min-h-screen">
+          {search === '' ? (
+            <div className="animate-in fade-in duration-300">
+              <h2 className="text-xl font-bold mb-4 text-white flex items-center gap-2">🔥 Trenddagi Izlashlar</h2>
+              <div className="flex flex-wrap gap-2">
+                {['💥 Jangari', '😂 Komediya', '🛸 Fantastika', '👻 Qo\'rqinchli', '2023', '2024'].map(tag => (
+                  <button 
+                    key={tag} 
+                    onClick={() => {
+                      const val = tag.replace(/[^a-zA-Z0-9' ]/g, '').trim(); 
+                      setSearch(val);
+                    }}
+                    className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full text-sm font-bold text-gray-200 border border-white/10 active:scale-95 transition-all hover:bg-white/20"
+                  >
+                    {tag}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <h2 className="text-xl font-bold mb-4 text-gray-300">Natijalar: {filteredMovies.length} ta</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 pb-10">
+                {filteredMovies.slice(0, visibleCount).length > 0 ? (
+                  filteredMovies.slice(0, visibleCount).map((movie, idx) => {
+                    if (idx === filteredMovies.slice(0, visibleCount).length - 1) {
+                      return <div ref={loadMoreRef} key={movie.code}>{renderMovieCard(movie, idx)}</div>
+                    }
+                    return renderMovieCard(movie, idx);
+                  })
+                ) : (
+                  <div className="col-span-full py-20 text-center text-gray-500">
+                    <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p>Hech narsa topilmadi</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       ) : (
         /* Netflix Home Layout */
@@ -434,7 +482,7 @@ function App() {
                 <section>
                   <h2 className="text-lg md:text-xl font-bold text-white px-4 mb-3">Top Kinolar (Trendda)</h2>
                   <div className="flex overflow-x-auto gap-3 px-4 pb-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    {topMovies.map((movie, idx) => renderMovieCard(movie, idx))}
+                    {topMovies.map((movie, idx) => renderMovieCard(movie, idx, true, idx + 1))}
                   </div>
                 </section>
               </>
